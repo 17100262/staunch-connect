@@ -2,6 +2,7 @@ class Connection < ApplicationRecord
   SOURCES = %w[hubstaff clickup].freeze
 
   encrypts :credential
+  encrypts :access_token
 
   enum :status, { disconnected: "disconnected", connected: "connected", error: "error" }, default: "disconnected"
 
