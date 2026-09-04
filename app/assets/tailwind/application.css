@@ -1,0 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-display: "DM Sans", "Inter", sans-serif;
+
+  --color-brand-25: #f3f7ff;
+  --color-brand-50: #e6eeff;
+  --color-brand-100: #c4d5ff;
+  --color-brand-200: #99b8ff;
+  --color-brand-300: #6695ff;
+  --color-brand-400: #3370ff;
+  --color-brand-500: #0052cc;
+  --color-brand-600: #0047b3;
+  --color-brand-700: #003a99;
+  --color-brand-800: #002e80;
+  --color-brand-900: #001f57;
+}

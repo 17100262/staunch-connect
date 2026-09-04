@@ -1,0 +1,25 @@
+<% content_for :title, "Home" %>
+<% content_for :subtitle do %>Welcome back, <%= Current.user.email_address %><% end %>
+
+<div class="h-full flex items-center justify-center p-8">
+  <div class="w-full max-w-[520px] bg-white border border-slate-200 rounded-2xl shadow-sm p-7">
+    <div class="flex items-start gap-3">
+      <span class="flex-none w-10 h-10 rounded-xl bg-brand-50 text-brand-400 flex items-center justify-center">
+        <i class="ph ph-plugs-connected text-xl"></i>
+      </span>
+      <div class="min-w-0">
+        <div class="font-bold text-base text-slate-900">Connect your first data source</div>
+        <div class="mt-0.5 text-sm text-slate-600 leading-relaxed">
+          Link Hubstaff and ClickUp to start building your consolidated task view. Other sources unlock as they come online.
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-6">
+      <%= link_to connections_path, class: "inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-brand-400 hover:bg-brand-500 text-white font-semibold text-sm" do %>
+        <i class="ph ph-gear-six text-lg"></i>
+        Go to Connector Settings
+      <% end %>
+    </div>
+  </div>
+</div>

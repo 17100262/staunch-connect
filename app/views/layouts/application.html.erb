@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <%= render "layouts/head" %>
+  </head>
+
+  <body class="h-screen w-screen m-0 bg-slate-50 font-sans antialiased">
+    <div class="flex h-full">
+      <%= render "layouts/sidebar" %>
+
+      <div class="flex-1 min-w-0 h-full flex flex-col overflow-auto">
+        <%= render "layouts/topbar" %>
+
+        <main class="flex-1">
+          <%= yield %>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

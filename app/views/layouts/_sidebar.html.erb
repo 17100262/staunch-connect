@@ -1,0 +1,32 @@
+<aside class="hidden md:flex md:flex-col w-62 shrink-0 h-full bg-white border-r border-slate-200 p-3 box-border">
+  <div class="flex items-center gap-2.5 px-2 pt-2 pb-4">
+    <span class="w-[30px] h-[30px] rounded-lg bg-brand-400 text-white flex items-center justify-center font-display font-extrabold text-base">S</span>
+    <span class="font-display font-extrabold text-lg text-slate-900">Staunch Connect</span>
+  </div>
+
+  <nav class="flex-1 flex flex-col gap-0.5 overflow-auto">
+    <%= sidebar_link "Home", root_path, icon: "house", active: current_page?(root_path) %>
+
+    <%= sidebar_section "Consolidated Data" %>
+    <%= sidebar_soon "Task 360°", icon: "squares-four" %>
+    <%= sidebar_soon "Search", icon: "magnifying-glass" %>
+    <%= sidebar_soon "Action Items", icon: "check-square" %>
+
+    <%= sidebar_section "Workflows" %>
+    <%= sidebar_soon "Invoicing", icon: "receipt" %>
+    <%= sidebar_soon "AI Assistant", icon: "sparkle" %>
+
+    <%= sidebar_section "Workspace" %>
+    <%= sidebar_link "Settings", connections_path, icon: "gear-six", active: controller_name == "connections" %>
+  </nav>
+
+  <div class="border-t border-slate-200 pt-2 mt-2 flex items-center gap-2.5 p-2">
+    <span class="w-8 h-8 rounded-full bg-brand-50 text-brand-400 flex items-center justify-center font-semibold text-sm flex-none">
+      <%= Current.user.email_address.first.upcase %>
+    </span>
+    <div class="min-w-0 overflow-hidden">
+      <div class="text-[13px] font-semibold text-slate-900 truncate"><%= Current.user.email_address %></div>
+      <%= button_to "Sign out", session_path, method: :delete, class: "text-xs text-slate-400 hover:text-slate-600 hover:underline p-0 bg-transparent border-0 cursor-pointer" %>
+    </div>
+  </div>
+</aside>
