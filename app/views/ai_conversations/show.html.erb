@@ -1,50 +1,24 @@
 <% content_for :title, @conversation.title.presence || "AI Assistant" %>
 <% content_for :subtitle do %>Ask questions about your invoicing data<% end %>
 
-<div class="p-8 flex flex-col gap-6 max-w-3xl mx-auto min-h-full">
+<div class="p-8 flex flex-col gap-6 max-w-3xl mx-auto min-h-full" data-controller="chat">
   <div class="flex items-center justify-between">
     <%= link_to ai_conversations_path, class: "inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700" do %>
       <i class="ph ph-arrow-left"></i> All conversations
     <% end %>
   </div>
 
-  <div class="flex-1 flex flex-col gap-4">
+  <div id="messages" data-chat-target="messages" class="flex-1 flex flex-col gap-4">
     <% if @conversation.ai_messages.empty? %>
-      <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 text-sm text-slate-600">
+      <div id="empty_hint" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 text-sm text-slate-600">
         Ask something like <span class="font-medium text-slate-900">"What was the total amount for the invoice in August?"</span> or <span class="font-medium text-slate-900">"What was the highest task in terms of hours?"</span>
       </div>
     <% end %>
 
-    <% @conversation.ai_messages.each do |message| %>
-      <% if message.role == "user" %>
-        <div class="flex justify-end">
-          <div class="max-w-[80%] bg-brand-400 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap"><%= message.content %></div>
-        </div>
-      <% else %>
-        <div class="flex justify-start">
-          <div class="max-w-[80%] flex flex-col gap-2">
-            <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-sm shadow-sm px-4 py-3 text-sm leading-relaxed text-slate-900 whitespace-pre-wrap"><%= message.content %></div>
-            <% if message.tool_calls.present? %>
-              <details class="text-xs text-slate-500">
-                <summary class="cursor-pointer hover:text-slate-700">Data used (<%= message.tool_calls.size %> lookup<%= "s" unless message.tool_calls.size == 1 %>)</summary>
-                <div class="mt-2 flex flex-col gap-2">
-                  <% message.tool_calls.each do |call| %>
-                    <div class="bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-mono overflow-x-auto">
-                      <div class="text-slate-700 font-semibold"><%= call["name"] %>(<%= call["input"].to_json %>)</div>
-                      <div class="mt-1 text-slate-500 whitespace-pre-wrap"><%= JSON.pretty_generate(call["result"]) %></div>
-                    </div>
-                  <% end %>
-                </div>
-              </details>
-            <% end %>
-          </div>
-        </div>
-      <% end %>
-    <% end %>
+    <%= render partial: "message", collection: @conversation.ai_messages, as: :message %>
+
+    <div id="chat_bottom" data-chat-target="bottom"></div>
   </div>
 
-  <%= form_with url: ai_conversation_messages_path(@conversation), method: :post, class: "sticky bottom-8 flex items-end gap-3 bg-white border border-slate-200 rounded-2xl shadow-sm p-3" do |form| %>
-    <%= form.text_area :question, rows: 1, placeholder: "Ask about an invoice…", class: "flex-1 resize-none border-0 focus:ring-0 focus:outline-none text-[15px] text-slate-900 placeholder:text-slate-400 py-2 px-2", required: true %>
-    <%= form.submit "Ask", class: "h-10 px-4 rounded-lg bg-brand-400 hover:bg-brand-500 text-white font-semibold text-sm cursor-pointer flex-none" %>
-  <% end %>
+  <%= render "message_form", conversation: @conversation %>
 </div>

@@ -1,0 +1,24 @@
+<% if message.role == "user" %>
+  <div class="flex justify-end">
+    <div class="max-w-[80%] bg-brand-400 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap"><%= message.content %></div>
+  </div>
+<% else %>
+  <div class="flex justify-start">
+    <div class="max-w-[80%] flex flex-col gap-2">
+      <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-sm shadow-sm px-4 py-3 text-sm leading-relaxed text-slate-900 whitespace-pre-wrap"><%= message.content %></div>
+      <% if message.tool_calls.present? %>
+        <details class="text-xs text-slate-500">
+          <summary class="cursor-pointer hover:text-slate-700">Data used (<%= message.tool_calls.size %> lookup<%= "s" unless message.tool_calls.size == 1 %>)</summary>
+          <div class="mt-2 flex flex-col gap-2">
+            <% message.tool_calls.each do |call| %>
+              <div class="bg-slate-50 border border-slate-200 rounded-lg p-2.5 font-mono overflow-x-auto">
+                <div class="text-slate-700 font-semibold"><%= call["name"] %>(<%= call["input"].to_json %>)</div>
+                <div class="mt-1 text-slate-500 whitespace-pre-wrap"><%= JSON.pretty_generate(call["result"]) %></div>
+              </div>
+            <% end %>
+          </div>
+        </details>
+      <% end %>
+    </div>
+  </div>
+<% end %>

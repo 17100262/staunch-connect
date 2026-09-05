@@ -1,0 +1,7 @@
+<%= turbo_stream.remove "empty_hint" %>
+
+<% @new_messages.each do |message| %>
+  <%= turbo_stream.before "chat_bottom", partial: "ai_conversations/message", locals: { message: message } %>
+<% end %>
+
+<%= turbo_stream.replace "message_form", partial: "ai_conversations/message_form", locals: { conversation: @conversation } %>
