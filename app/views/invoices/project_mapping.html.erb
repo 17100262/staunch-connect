@@ -1,0 +1,46 @@
+<% content_for :title, "Invoicing" %>
+<% content_for :subtitle do %>Select a client and billing period to build a reconciliation<% end %>
+
+<div class="h-full flex items-center justify-center p-8">
+  <div class="w-full max-w-[480px] bg-white border border-slate-200 rounded-2xl shadow-sm p-7">
+    <div class="flex items-start gap-3 mb-5">
+      <span class="flex-none w-10 h-10 rounded-xl bg-brand-50 text-brand-400 flex items-center justify-center">
+        <i class="ph ph-link text-xl"></i>
+      </span>
+      <div class="min-w-0">
+        <div class="font-bold text-base text-slate-900">Map "<%= @clickup_space_name || @clickup_space_id %>"</div>
+        <div class="mt-0.5 text-sm text-slate-600 leading-relaxed">
+          Which Hubstaff project should we total logged hours from for this ClickUp project? You only need to do this once.
+        </div>
+      </div>
+    </div>
+
+    <% if @hubstaff_project_options.empty? %>
+      <p class="text-sm text-slate-500">No Hubstaff projects found.</p>
+    <% else %>
+      <%= form_with url: project_mappings_path, method: :post, class: "flex flex-col gap-4" do |form| %>
+        <%= form.hidden_field :clickup_space_id, value: @clickup_space_id %>
+        <%= form.hidden_field :clickup_space_name, value: @clickup_space_name %>
+
+        <div>
+          <label class="block text-sm font-medium text-slate-900 mb-1.5" for="hubstaff_project_value">Hubstaff Project</label>
+          <div class="relative flex items-center gap-2 h-11 px-3.5 bg-slate-50 border border-slate-200 rounded-xl focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-400/20">
+            <select name="hubstaff_project_value" id="hubstaff_project_value" required style="appearance:none;-webkit-appearance:none;" class="flex-1 min-w-0 border-0 outline-none bg-transparent text-[15px] text-slate-900 h-full">
+              <option value="" disabled selected hidden>Select a project</option>
+              <% @hubstaff_project_options.each do |option| %>
+                <option value="<%= option[:id] %>|<%= option[:name] %>"><%= option[:name] %></option>
+              <% end %>
+            </select>
+            <i class="ph ph-caret-down text-lg text-slate-400"></i>
+          </div>
+        </div>
+
+        <%= form.submit "Save Mapping", class: "w-full h-11 rounded-lg bg-brand-400 hover:bg-brand-500 text-white font-semibold text-sm cursor-pointer" %>
+      <% end %>
+    <% end %>
+
+    <div class="mt-4">
+      <%= link_to "Back to projects", invoicing_path, class: "text-sm text-slate-500 hover:text-slate-700" %>
+    </div>
+  </div>
+</div>

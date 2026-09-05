@@ -4,6 +4,10 @@ Rails.application.routes.draw do
   resources :connections, only: %i[index create destroy] do
     member { post :sync }
   end
+
+  get "invoicing", to: "invoices#new", as: :invoicing
+  get "invoicing/draft", to: "invoices#draft", as: :invoicing_draft
+  resources :project_mappings, only: %i[create destroy]
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.

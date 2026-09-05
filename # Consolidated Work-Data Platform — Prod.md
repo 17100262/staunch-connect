@@ -128,6 +128,9 @@ The linking layer, search, reconciliation table, and AI assistant all depend on 
 - **Data to pull:** organizations → projects → users → tasks → daily activity (hours per user/project/task/day).
 - **Auth:** OAuth2 or personal access token; token needs manager/owner role to see org-wide data. Rate limit: 1,000 requests/hour/app — daily aggregation keeps you well under this.
 - **Sync cadence:** nightly full sync + on-demand "refresh" button before generating an invoice (to catch same-day entries).
+- **Confirmed at build time — auth is not a plain Bearer token:** what Hubstaff calls a "Personal Access Token" is actually an OAuth2 **refresh token**, not something you can send directly as `Authorization: Bearer <token>`. It must first be exchanged via `POST https://account.hubstaff.com/access_tokens` (`grant_type=refresh_token`) for a short-lived access token (~24h) before any API call. That exchange **rotates the refresh token on every call** — the previous one stops working, so the new one must be persisted immediately — and the exchange endpoint itself is capped at **5 requests/hour**, separate from the general 1,000/hour API limit. In practice this means the access token (and its expiry) must be cached and only refreshed once expired, not re-exchanged per request.
+- **Confirmed at build time — `activities/daily` params and pagination:** the endpoint takes `date[start]`, `date[stop]`, and `project_ids[]` query params (not guessable from the docs site, which is JS-gated). It **paginates at 100 rows/page** via a `pagination.next_page_start_id` cursor in the response, passed back as `page_start_id` for the next page — there is no total-count field, and a query that doesn't paginate through to the end silently truncates with no error. This was caught in testing: an unpaginated call undercounted a real project-month by 57% (190h shown vs. 445h actual) before the pagination loop was added. Each row is one **user × project × task × day**; sum the `tracked` field (seconds) for a project/month total — `manual` + `input_tracked` are that row's breakdown of `tracked` (manually entered vs. captured by the live tracker).
+- **Open/unconfirmed:** Hubstaff aggregates "daily" activity in the **organization's own timezone**, while a naive integration sends plain UTC-based month boundaries for `date[start]`/`date[stop]`. Not yet confirmed as a real-world discrepancy, but worth checking against a live Hubstaff report if reconciliation totals look off by a day's worth of activity at a month boundary.
 
 ### 5.2 ClickUp (tasks, estimates, details)
 
@@ -135,6 +138,8 @@ The linking layer, search, reconciliation table, and AI assistant all depend on 
 - **Auth:** ClickUp OAuth2 (or personal API token for a single-workspace MVP).
 - **Mapping key:** each ClickUp task gets a canonical `task_id` in your data store — this is the anchor that Hubstaff time entries, Slack threads, GitHub PRs, and emails all get linked to.
 - **Sync cadence:** near-real-time via ClickUp webhooks (task created/updated/time tracked) rather than polling, since ClickUp supports webhooks well.
+- **Confirmed at build time — task fields and pagination:** `GET /list/{id}/task` excludes closed tasks unless `include_closed=true` is passed (status filters alone don't override this), and paginates at 100/page via `page=N` with no total-count field — loop until a page returns fewer than 100. Confirmed task fields: `custom_id` (nullable — fall back to `id` as the "ticket number" when absent), `name` (title), `time_estimate` (nullable, integer **milliseconds** — ClickUp's own OpenAPI spec incorrectly documents this as a string).
+- **Confirmed at build time — space/folder/list hierarchy:** `GET /team` lists workspaces (this account has exactly one, matching the single-workspace MVP assumption above — now verified, not just assumed); `GET /team/{id}/space` lists spaces ("projects" in this spec's language); `GET /space/{id}/folder` conveniently returns each folder's `lists` (id/name) nested inline, so no extra per-folder call is needed; `GET /space/{id}/list` separately gives the folderless lists directly in a space.
 
 ### 5.3 Slack (contextual discussion)
 
@@ -423,6 +428,11 @@ The summary panel needs a specific Hubstaff project to total hours against, but 
 - `project_mappings` (clickup_project_id, hubstaff_project_id) — see 15.6
 - No persistent `tasks` or `time_entries` tables strictly required yet if everything is fetched on-demand and rendered directly (per 15.5) rather than cached — simplest possible Phase 0. Add these tables in Phase 1 once caching/background sync is introduced.
 
+**As actually implemented:**
+- `connections` also has `access_token` and `access_token_expires_at` (both encrypted) — needed to cache Hubstaff's short-lived access token per the OAuth exchange described in §5.1, so it isn't re-exchanged on every request against that endpoint's 5/hour cap.
+- `project_mappings` uses `clickup_space_id`/`clickup_space_name` (a ClickUp *Space*, i.e. "project" in this spec's language) rather than `clickup_project_id` — ClickUp has no "project" object of its own; Space is the closest equivalent and is what the connector UI lets you pick.
+- The invoice draft flow (§15.3) is implemented as a stateless, GET-param-driven wizard (pick space → map to a Hubstaff project if not already mapped → pick list(s) → draft page), not session-backed — every step is a plain URL, so it's bookmarkable and needs no server-side wizard state. A mapping has no edit UI yet; "remapping" just deletes the `project_mapping` row and re-runs the mapping step.
+
 ### 15.10 Acceptance criteria
 
 1. A user can log in and cannot access the connector module or invoice module while logged out.
@@ -432,3 +442,14 @@ The summary panel needs a specific Hubstaff project to total hours against, but 
 5. The summary panel's "hours logged in Hubstaff this month" matches what Hubstaff's own UI shows for the mapped project and selected month.
 6. Changing the month selector updates the Hubstaff total accordingly without needing to reselect the project/lists.
 7. Disconnecting a source in the connector module blocks the invoice flow from working until reconnected, with a clear message rather than a broken page.
+
+---
+
+## 16. Design System
+
+Not part of the original spec, but adopted mid-build from a Claude Design mockup and now the visual baseline for every screen — future screens should match it rather than introduce new styling conventions.
+
+- **Tokens:** Tailwind v4, configured CSS-first in `app/assets/tailwind/application.css` via `@theme` — a custom `brand` color scale (blue, `brand-400` as the primary action color) layered on Tailwind's stock `slate` scale for text/borders/surfaces, plus Google-Fonts-hosted **Inter** (`font-sans`, body/UI text) and **DM Sans** (`font-display`, headings/brand wordmark).
+- **Icons:** Phosphor Icons (regular/bold/fill weights), loaded via CDN `<link>` tags in `app/views/layouts/_head.html.erb`.
+- **App shell:** an authenticated layout (`app/views/layouts/application.html.erb`) rendering a persistent sidebar (`_sidebar.html.erb` — brand header, grouped nav with "Soon" badges for unbuilt sections) and topbar (`_topbar.html.erb` — per-page title/subtitle via `content_for`), versus a separate centered `guest.html.erb` layout for login/password screens.
+- **Component conventions:** white cards on a `slate-50` app background (`bg-white border-slate-200 rounded-2xl shadow-sm`), `brand-400`/`brand-500` solid buttons, `slate-50`/`slate-200` input fields with a brand-colored focus ring — established first on the connector Settings and invoicing screens, reused from there.

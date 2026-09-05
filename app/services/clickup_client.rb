@@ -7,6 +7,7 @@ class ClickupClient
   class RequestError < StandardError; end
 
   BASE_URL = "https://api.clickup.com/api/v2"
+  TASKS_PER_PAGE = 100
 
   def initialize(token)
     @token = token
@@ -17,8 +18,16 @@ class ClickupClient
     true
   end
 
+  def teams
+    get("/team")["teams"]
+  end
+
   def spaces(team_id)
     get("/team/#{team_id}/space")["spaces"]
+  end
+
+  def folders(space_id)
+    get("/space/#{space_id}/folder")["folders"]
   end
 
   def lists(space_id)
@@ -26,13 +35,26 @@ class ClickupClient
   end
 
   def tasks(list_id)
-    get("/list/#{list_id}/task")["tasks"]
+    tasks = []
+    page = 0
+
+    loop do
+      batch = get("/list/#{list_id}/task", "include_closed" => "true", "page" => page)["tasks"]
+      tasks.concat(batch)
+      break if batch.size < TASKS_PER_PAGE
+
+      page += 1
+    end
+
+    tasks
   end
 
   private
 
-  def get(path)
+  def get(path, query = {})
     uri = URI("#{BASE_URL}#{path}")
+    uri.query = URI.encode_www_form(query) if query.any?
+
     request = Net::HTTP::Get.new(uri)
     request["Authorization"] = @token
 

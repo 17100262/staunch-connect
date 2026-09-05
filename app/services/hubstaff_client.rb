@@ -35,7 +35,20 @@ class HubstaffClient
   end
 
   def daily_activities(organization_id:, project_id:, date_from:, date_to:)
-    get("/organizations/#{organization_id}/activities/daily", "project_ids" => project_id, "date" => date_from, "time_slot" => "#{date_from},#{date_to}")
+    activities = []
+    query = { "date[start]" => date_from, "date[stop]" => date_to, "project_ids[]" => project_id }
+
+    loop do
+      response = get("/organizations/#{organization_id}/activities/daily", query)
+      activities.concat(response["daily_activities"])
+
+      next_page_start_id = response.dig("pagination", "next_page_start_id")
+      break unless next_page_start_id
+
+      query["page_start_id"] = next_page_start_id
+    end
+
+    activities
   end
 
   private

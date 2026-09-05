@@ -1,0 +1,63 @@
+<% content_for :title, "Invoicing" %>
+<% content_for :subtitle do %><%= @mapping.clickup_space_name || @clickup_space_id %> reconciliation<% end %>
+
+<div class="p-8 flex flex-col gap-6">
+  <% if alert = flash[:alert] %>
+    <p class="py-2 px-3 bg-red-50 text-red-500 font-medium rounded-lg inline-block"><%= alert %></p>
+  <% end %>
+
+  <%= form_with url: invoicing_draft_path, method: :get, class: "flex items-center justify-between gap-3 flex-wrap" do |form| %>
+    <%= form.hidden_field :clickup_space_id, value: @clickup_space_id %>
+    <% @list_ids.each do |list_id| %>
+      <%= hidden_field_tag "list_ids[]", list_id %>
+    <% end %>
+
+    <div class="text-sm text-slate-600">
+      Mapped to Hubstaff project "<%= @mapping.hubstaff_project_name %>"
+    </div>
+
+    <div class="flex items-center gap-2">
+      <label class="text-sm text-slate-600" for="month">Billing Period</label>
+      <select name="month" id="month" onchange="this.form.requestSubmit()" class="h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm text-slate-900">
+        <% @month_options.each do |value, label| %>
+          <option value="<%= value %>" <%= "selected" if value == @month %>><%= label %></option>
+        <% end %>
+      </select>
+    </div>
+  <% end %>
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
+    <div class="bg-white border border-slate-200 rounded-2xl p-4">
+      <div class="text-xs text-slate-400">Estimated</div>
+      <div class="mt-1 font-display font-bold text-2xl text-slate-900"><%= number_with_precision(@total_estimate_hours, precision: 1) %>h</div>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-2xl p-4">
+      <div class="text-xs text-slate-400">Logged (Hubstaff)</div>
+      <div class="mt-1 font-display font-bold text-2xl text-slate-900"><%= number_with_precision(@total_logged_hours, precision: 1) %>h</div>
+    </div>
+  </div>
+
+  <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+    <div class="grid grid-cols-[1fr_140px_120px] gap-3 px-4 py-3 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+      <div>Task</div>
+      <div>Ticket</div>
+      <div>Estimate</div>
+    </div>
+
+    <% if @line_items.empty? %>
+      <div class="px-4 py-6 text-sm text-slate-500">No tasks found in the selected list(s).</div>
+    <% else %>
+      <% @line_items.each do |item| %>
+        <div class="grid grid-cols-[1fr_140px_120px] gap-3 px-4 py-3 border-t border-slate-200 text-sm">
+          <div class="text-slate-900 font-medium truncate"><%= item[:title] %></div>
+          <div class="text-slate-500 font-mono text-xs truncate"><%= item[:ticket] %></div>
+          <div class="text-slate-900"><%= item[:estimate_hours] ? "#{number_with_precision(item[:estimate_hours], precision: 1)}h" : "—" %></div>
+        </div>
+      <% end %>
+    <% end %>
+  </div>
+
+  <div>
+    <%= link_to "Back to project", invoicing_path(clickup_space_id: @clickup_space_id), class: "text-sm text-slate-500 hover:text-slate-700" %>
+  </div>
+</div>
