@@ -243,6 +243,8 @@ Invoicing is one consumer of the consolidated data — the same task-linked reco
 5. **Generate invoice** — line items become the invoice, exportable as PDF/CSV or pushed to an accounting tool (QuickBooks/Xero — TBD, see Open Questions).
 6. **Audit trail** — every override is stored with your note and timestamp, so future-you (or a client) can see why a line item was billed the way it was (same pattern as the Action Items Hub's status history, Section 7.3).
 
+**Status:** a simplified slice of this shipped early, folded into Phase 0's scope (see §15) rather than waiting for Phase 1 — persisted invoices with a flat hourly rate (per project, overridable per line item) and a billable on/off toggle per line item, plus XLSX export. What's still genuinely Phase 1, not yet built: the 4-way bill decision (logged vs. estimated vs. custom vs. exclude — today everything bills at the ClickUp estimate, there's no "bill as logged" option), the AI-suggested recommendation text, variance flagging, related-context links, and the override audit trail.
+
 ---
 
 ## 9. Feature: AI Assistant
@@ -368,6 +370,8 @@ Ship the smallest working slice of the product: log in, connect Hubstaff and Cli
 4. **ClickUp integration** — fetch tasks for a chosen project's chosen list(s): task title, task ID/custom ID, and time estimate.
 5. **Invoice draft flow** (15.3) — the concrete screen described below.
 
+**Scope expanded mid-build** (moved forward from Phase 1 — see the status note on Section 8): the draft page is no longer the end of the flow. It can now be saved as a persisted, editable invoice — a default hourly rate per project mapping (overridable per line item), a billable on/off toggle per line item, an invoices list (with delete), and XLSX export.
+
 ### 15.3 The flow, as specified
 
 1. **Connector setup:** add Hubstaff credentials and ClickUp credentials once, in the connector module.
@@ -378,8 +382,14 @@ Ship the smallest working slice of the product: log in, connect Hubstaff and Cli
    - **Summary panel at the top:**
      - **Sum of estimated hours** across the selected tasks.
      - **Total hours logged in Hubstaff for that month** (for the project this invoice covers — see 15.6 on how the app knows which Hubstaff project that is).
-   - No per-task actual-hours column and no bill/exclude decision controls yet — this page is a side-by-side sanity check between what was estimated and what was actually logged in aggregate, not the full reconciliation workflow from Section 8. That richer per-task comparison depends on Hubstaff-time-to-ClickUp-task linking, which is intentionally deferred (see 15.7).
+   - No per-task actual-hours column yet — this page still only compares ClickUp's estimate against Hubstaff's aggregate total, not a per-task logged figure. That richer per-task comparison depends on Hubstaff-time-to-ClickUp-task linking, which is intentionally deferred (see 15.7).
 5. A **month selector** on this page determines both which month's Hubstaff hours are totaled and (implicitly) the invoicing period — default to the current month, but let it be changed.
+
+**As actually implemented, the flow continues past the draft page:**
+6. **"Save as Invoice"** on the draft page persists it — one `Invoice` (belongs to the project mapping, keyed by month) and one `InvoiceLineItem` per task, snapshotting title/ticket/estimate hours and defaulting each line's hourly rate from the project mapping's rate. Re-saving for a project+month that already has an invoice reopens it rather than creating a duplicate.
+7. The persisted invoice has its own page: an editable **name** (defaults to the project name, independent of it once saved), and each line item's **title**, **hourly rate**, and a **billable** checkbox are all editable — the total recalculates from whatever's currently saved. A **Delete Invoice** action removes it (with confirmation).
+8. **Export XLSX** streams the invoice as a real `.xlsx` workbook (Task/Ticket/Hours/Rate/Amount, a Total row) — non-billable line items are excluded from the export.
+9. The Invoicing sidebar entry opens an **index of existing invoices** first (project, billing period, total hours, total billed, delete), not the picker directly — a **Create Invoice** button on that page is what starts the flow above.
 
 ### 15.4 Connector module — credential handling
 
@@ -410,8 +420,8 @@ The summary panel needs a specific Hubstaff project to total hours against, but 
 
 ### 15.7 What's deliberately deferred
 
-- **Task-level hour matching** (i.e., a "logged hours" column next to each task's estimate, not just an aggregate total) — this needs Hubstaff time entries linked to individual ClickUp tasks, which depends on the native-integration question above and is real additional work either way. Phase 0 ships the aggregate comparison only; per-task matching is Phase 1's Invoice Reconciliation feature (Section 8).
-- **Bill/exclude/override decisions per line item**, invoice generation/export, audit trail — all Phase 1 (Section 8), not Phase 0.
+- **Task-level hour matching** (i.e., a "logged hours" column next to each task's estimate, not just an aggregate total) — this needs Hubstaff time entries linked to individual ClickUp tasks, which depends on the native-integration question above and is real additional work either way. Phase 0 ships the aggregate comparison only; per-task matching is Phase 1's Invoice Reconciliation feature (Section 8). Billing today is always at the **ClickUp estimate** — there's no "bill as logged" option.
+- **The 4-way bill decision** (logged / estimated / custom / exclude), the AI-suggested recommendation, automatic variance flagging, related-context links (Slack/GitHub/email), and the override audit trail — all still Phase 1 (Section 8). What *did* ship early: a flat hourly rate (per project, overridable per line item) and a simple billable on/off toggle — see the updated 15.3 and Section 8's status note.
 - Multi-user roles, per-source scope controls, any other data source (Slack/GitHub/Fathom/Gmail).
 
 ### 15.8 Tech stack
@@ -432,6 +442,8 @@ The summary panel needs a specific Hubstaff project to total hours against, but 
 - `connections` also has `access_token` and `access_token_expires_at` (both encrypted) — needed to cache Hubstaff's short-lived access token per the OAuth exchange described in §5.1, so it isn't re-exchanged on every request against that endpoint's 5/hour cap.
 - `project_mappings` uses `clickup_space_id`/`clickup_space_name` (a ClickUp *Space*, i.e. "project" in this spec's language) rather than `clickup_project_id` — ClickUp has no "project" object of its own; Space is the closest equivalent and is what the connector UI lets you pick.
 - The invoice draft flow (§15.3) is implemented as a stateless, GET-param-driven wizard (pick space → map to a Hubstaff project if not already mapped → pick list(s) → draft page), not session-backed — every step is a plain URL, so it's bookmarkable and needs no server-side wizard state. A mapping has no edit UI yet; "remapping" just deletes the `project_mapping` row and re-runs the mapping step.
+- `project_mappings` also gained `default_hourly_rate` (decimal) — set on the mapping form, becomes the default `hourly_rate` for that project's line items going forward.
+- Two new tables power the persisted invoice from 15.3 steps 6–9: `invoices` (`project_mapping_id`, `name` — editable, defaults to the project name but decoupled from it once saved, `month`; unique on `[project_mapping_id, month]`) and `invoice_line_items` (`invoice_id`, `clickup_task_id`, `title` — editable snapshot, `ticket`, `estimate_hours`, `hourly_rate`, `billable`, default `true`). A line item's dollar amount is never stored — it's a plain method (`billable? ? hourly_rate * estimate_hours : 0`) computed on read, so it can't drift from its own inputs.
 
 ### 15.10 Acceptance criteria
 
@@ -442,6 +454,10 @@ The summary panel needs a specific Hubstaff project to total hours against, but 
 5. The summary panel's "hours logged in Hubstaff this month" matches what Hubstaff's own UI shows for the mapped project and selected month.
 6. Changing the month selector updates the Hubstaff total accordingly without needing to reselect the project/lists.
 7. Disconnecting a source in the connector module blocks the invoice flow from working until reconnected, with a clear message rather than a broken page.
+8. Clicking "Save as Invoice" on a draft persists it and lands on an editable invoice page; doing so again for the same project and month reopens that same invoice rather than creating a second one.
+9. Editing a line item's title, hourly rate, or billable checkbox and saving updates that row's amount and the invoice total; unchecking billable zeroes that row out of the total without deleting it.
+10. "Export XLSX" downloads a workbook whose rows and total match what's on screen, with non-billable rows absent from the file.
+11. The Invoicing sidebar entry lands on a list of existing invoices (project, period, hours, billed) with a working delete action, not straight into the picker — that's reached via "Create Invoice" on the list page.
 
 ---
 
