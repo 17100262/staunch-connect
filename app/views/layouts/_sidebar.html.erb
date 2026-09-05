@@ -14,7 +14,7 @@
 
     <%= sidebar_section "Workflows" %>
     <%= sidebar_link "Invoicing", invoices_path, icon: "receipt", active: controller_name == "invoices" %>
-    <%= sidebar_soon "AI Assistant", icon: "sparkle" %>
+    <%= sidebar_link "AI Assistant", ai_conversations_path, icon: "sparkle", active: controller_name == "ai_conversations" %>
 
     <%= sidebar_section "Workspace" %>
     <%= sidebar_link "Settings", connections_path, icon: "gear-six", active: controller_name == "connections" %>

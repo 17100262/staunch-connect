@@ -11,6 +11,10 @@ Rails.application.routes.draw do
     member { get :export }
   end
   resources :project_mappings, only: %i[create destroy]
+
+  resources :ai_conversations, only: %i[index show create destroy] do
+    resources :messages, only: %i[create], controller: "ai_messages"
+  end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
