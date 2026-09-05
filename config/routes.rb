@@ -7,6 +7,9 @@ Rails.application.routes.draw do
 
   get "invoicing", to: "invoices#new", as: :invoicing
   get "invoicing/draft", to: "invoices#draft", as: :invoicing_draft
+  resources :invoices, only: %i[index create show update destroy] do
+    member { get :export }
+  end
   resources :project_mappings, only: %i[create destroy]
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 

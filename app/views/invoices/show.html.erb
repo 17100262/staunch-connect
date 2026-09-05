@@ -1,0 +1,66 @@
+<% content_for :title, @invoice.name %>
+<% content_for :subtitle do %><%= Date.strptime(@invoice.month, "%Y-%m").strftime("%B %Y") %><% end %>
+
+<div class="p-8 flex flex-col gap-6">
+  <% if notice = flash[:notice] %>
+    <p class="py-2 px-3 bg-green-50 text-green-500 font-medium rounded-lg inline-block"><%= notice %></p>
+  <% end %>
+
+  <div class="flex items-center justify-between">
+    <div class="text-sm text-slate-600">Mapped to Hubstaff project "<%= @invoice.project_mapping.hubstaff_project_name %>"</div>
+    <div class="flex items-center gap-3">
+      <%= button_to "Delete Invoice", invoice_path(@invoice), method: :delete, class: "h-10 px-4 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 text-red-600 font-semibold text-sm cursor-pointer", form: { data: { turbo_confirm: "Delete this invoice? This can't be undone." } } %>
+      <%= link_to export_invoice_path(@invoice), class: "inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-brand-400 hover:bg-brand-500 text-white font-semibold text-sm" do %>
+        <i class="ph ph-file-text text-lg"></i>
+        Export XLSX
+      <% end %>
+    </div>
+  </div>
+
+  <%= form_with model: @invoice, class: "flex flex-col gap-4" do |form| %>
+    <div>
+      <label class="block text-sm font-medium text-slate-900 mb-1.5" for="invoice_name">Invoice Name</label>
+      <%= form.text_field :name, id: "invoice_name", class: "w-full max-w-md h-11 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-[15px] font-medium text-slate-900 focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-400/20" %>
+    </div>
+
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      <div class="grid grid-cols-[1fr_120px_90px_110px_110px_50px] gap-3 px-4 py-3 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <div>Task</div>
+        <div>Ticket</div>
+        <div>Estimate</div>
+        <div>Rate</div>
+        <div>Amount</div>
+        <div>Bill?</div>
+      </div>
+
+      <% if @invoice.invoice_line_items.empty? %>
+        <div class="px-4 py-6 text-sm text-slate-500">This invoice has no line items.</div>
+      <% else %>
+        <%= form.fields_for :invoice_line_items do |line_form| %>
+          <% item = line_form.object %>
+          <div class="grid grid-cols-[1fr_120px_90px_110px_110px_50px] gap-3 px-4 py-3 border-t border-slate-200 text-sm items-center <%= "opacity-50" unless item.billable %>">
+            <%= line_form.text_field :title, class: "min-w-0 border border-transparent hover:border-slate-200 focus:border-brand-400 rounded-md px-2 py-1 text-sm text-slate-900 bg-transparent focus:bg-white focus:outline-none" %>
+            <div class="text-slate-500 font-mono text-xs truncate"><%= item.ticket %></div>
+            <div class="text-slate-900"><%= number_with_precision(item.estimate_hours, precision: 1) %>h</div>
+            <%= line_form.number_field :hourly_rate, step: 0.01, min: 0, class: "min-w-0 border border-transparent hover:border-slate-200 focus:border-brand-400 rounded-md px-2 py-1 text-sm text-slate-900 bg-transparent focus:bg-white focus:outline-none" %>
+            <div class="text-slate-900 font-medium"><%= number_to_currency(item.amount) %></div>
+            <div class="flex items-center justify-center">
+              <%= line_form.check_box :billable, class: "rounded border-slate-300 text-brand-400 focus:ring-brand-400" %>
+            </div>
+          </div>
+        <% end %>
+
+        <div class="grid grid-cols-[1fr_120px_90px_110px_110px_50px] gap-3 px-4 py-3 border-t border-slate-200 text-sm bg-slate-50 font-semibold text-slate-900">
+          <div class="col-span-4 text-right">Total</div>
+          <div><%= number_to_currency(@invoice.total_amount) %></div>
+          <div></div>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="flex items-center justify-between">
+      <%= link_to "Back to Invoices", invoices_path, class: "text-sm text-slate-500 hover:text-slate-700" %>
+      <%= form.submit "Save Changes", class: "h-10 px-4 rounded-lg bg-brand-400 hover:bg-brand-500 text-white font-semibold text-sm cursor-pointer" %>
+    </div>
+  <% end %>
+</div>

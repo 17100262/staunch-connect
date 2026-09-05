@@ -6,7 +6,8 @@ class ProjectMappingsController < ApplicationController
       clickup_space_id: params[:clickup_space_id],
       clickup_space_name: params[:clickup_space_name],
       hubstaff_project_id: hubstaff_project_id,
-      hubstaff_project_name: hubstaff_project_name
+      hubstaff_project_name: hubstaff_project_name,
+      default_hourly_rate: params[:default_hourly_rate].presence
     )
     redirect_to invoicing_path(clickup_space_id: params[:clickup_space_id])
   end

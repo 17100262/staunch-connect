@@ -4,7 +4,11 @@ class InvoicesController < ApplicationController
     HubstaffClient::AuthenticationError, HubstaffClient::RequestError
   ].freeze
 
-  before_action :require_connections, only: %i[new draft]
+  before_action :require_connections, only: %i[new draft create]
+
+  def index
+    @invoices = Invoice.includes(:project_mapping, :invoice_line_items).order(created_at: :desc)
+  end
 
   def new
     @clickup_space_id = params[:clickup_space_id]
@@ -54,6 +58,7 @@ class InvoicesController < ApplicationController
 
     @line_items = @list_ids.flat_map { |list_id| clickup_client.tasks(list_id) }.map { |task| build_line_item(task) }
     @total_estimate_hours = @line_items.sum { |item| item[:estimate_hours] || 0 }
+    @total_amount = @line_items.sum { |item| (item[:estimate_hours] || 0) * (@mapping.default_hourly_rate || 0) }
 
     organization_id = hubstaff_client.organizations.first["id"]
     activities = hubstaff_client.daily_activities(
@@ -70,7 +75,86 @@ class InvoicesController < ApplicationController
     redirect_to connections_path, alert: e.message
   end
 
+  def create
+    clickup_space_id = params[:clickup_space_id]
+    list_ids = Array(params[:list_ids]).reject(&:blank?)
+    month = params[:month].presence || Date.current.strftime("%Y-%m")
+
+    if clickup_space_id.blank? || list_ids.empty?
+      return redirect_to invoicing_path, alert: "Select a project and at least one list first."
+    end
+
+    mapping = ProjectMapping.find_by(clickup_space_id: clickup_space_id)
+
+    if mapping.nil?
+      return redirect_to invoicing_path(clickup_space_id: clickup_space_id), alert: "Map this project to a Hubstaff project first."
+    end
+
+    invoice = Invoice.find_by(project_mapping: mapping, month: month)
+    invoice ||= build_invoice(mapping, month, list_ids)
+
+    persist_hubstaff_tokens!
+    redirect_to invoice_path(invoice)
+  rescue *RETRYABLE_ERRORS => e
+    persist_hubstaff_tokens!
+    redirect_to connections_path, alert: e.message
+  end
+
+  def show
+    @invoice = Invoice.find(params[:id])
+  end
+
+  def update
+    @invoice = Invoice.find(params[:id])
+    @invoice.update!(invoice_params)
+    redirect_to invoice_path(@invoice), notice: "Invoice updated."
+  end
+
+  def destroy
+    Invoice.find(params[:id]).destroy
+    redirect_to invoices_path, notice: "Invoice deleted."
+  end
+
+  def export
+    invoice = Invoice.find(params[:id])
+
+    package = Axlsx::Package.new
+    package.workbook.add_worksheet(name: "Invoice") do |sheet|
+      sheet.add_row [ "Task", "Ticket", "Hours", "Rate", "Amount" ]
+      invoice.invoice_line_items.where(billable: true).each do |item|
+        sheet.add_row [ item.title, item.ticket, item.estimate_hours, item.hourly_rate, item.amount ]
+      end
+      sheet.add_row []
+      sheet.add_row [ nil, nil, nil, "Total", invoice.total_amount ]
+    end
+
+    filename = "invoice-#{invoice.name}-#{invoice.month}".parameterize(separator: "-") + ".xlsx"
+    send_data package.to_stream.read, filename: filename, type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  end
+
   private
+
+  def invoice_params
+    params.require(:invoice).permit(:name, invoice_line_items_attributes: %i[id title hourly_rate billable])
+  end
+
+  def build_invoice(mapping, month, list_ids)
+    tasks = list_ids.flat_map { |list_id| clickup_client.tasks(list_id) }
+    name = mapping.clickup_space_name.presence || mapping.clickup_space_id
+
+    Invoice.create!(project_mapping: mapping, month: month, name: name) do |invoice|
+      tasks.each do |task|
+        invoice.invoice_line_items.build(
+          clickup_task_id: task["id"],
+          title: task["name"],
+          ticket: task["custom_id"].presence || task["id"],
+          estimate_hours: task["time_estimate"] ? task["time_estimate"] / 3_600_000.0 : 0,
+          hourly_rate: mapping.default_hourly_rate,
+          billable: true
+        )
+      end
+    end
+  end
 
   def require_connections
     @clickup_connection = Connection.find_by(source: "clickup")

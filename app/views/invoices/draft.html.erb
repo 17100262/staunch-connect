@@ -26,7 +26,7 @@
     </div>
   <% end %>
 
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl">
     <div class="bg-white border border-slate-200 rounded-2xl p-4">
       <div class="text-xs text-slate-400">Estimated</div>
       <div class="mt-1 font-display font-bold text-2xl text-slate-900"><%= number_with_precision(@total_estimate_hours, precision: 1) %>h</div>
@@ -35,29 +35,61 @@
       <div class="text-xs text-slate-400">Logged (Hubstaff)</div>
       <div class="mt-1 font-display font-bold text-2xl text-slate-900"><%= number_with_precision(@total_logged_hours, precision: 1) %>h</div>
     </div>
+    <div class="bg-white border border-slate-200 rounded-2xl p-4">
+      <div class="text-xs text-slate-400">Invoice Total</div>
+      <div class="mt-1 font-display font-bold text-2xl text-slate-900"><%= number_to_currency(@total_amount) %></div>
+    </div>
   </div>
 
+  <% unless @mapping.default_hourly_rate %>
+    <p class="text-sm text-slate-500 -mt-2">
+      No hourly rate set for this project yet — amounts show as $0.00 until you set one on the
+      <%= link_to "project mapping", invoicing_path(clickup_space_id: @clickup_space_id), class: "text-brand-400 hover:text-brand-500 font-medium" %>.
+    </p>
+  <% end %>
+
   <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-    <div class="grid grid-cols-[1fr_140px_120px] gap-3 px-4 py-3 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+    <div class="grid grid-cols-[1fr_120px_90px_90px_110px] gap-3 px-4 py-3 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
       <div>Task</div>
       <div>Ticket</div>
       <div>Estimate</div>
+      <div>Rate</div>
+      <div>Amount</div>
     </div>
 
     <% if @line_items.empty? %>
       <div class="px-4 py-6 text-sm text-slate-500">No tasks found in the selected list(s).</div>
     <% else %>
       <% @line_items.each do |item| %>
-        <div class="grid grid-cols-[1fr_140px_120px] gap-3 px-4 py-3 border-t border-slate-200 text-sm">
+        <% amount = (item[:estimate_hours] || 0) * (@mapping.default_hourly_rate || 0) %>
+        <div class="grid grid-cols-[1fr_120px_90px_90px_110px] gap-3 px-4 py-3 border-t border-slate-200 text-sm">
           <div class="text-slate-900 font-medium truncate"><%= item[:title] %></div>
           <div class="text-slate-500 font-mono text-xs truncate"><%= item[:ticket] %></div>
           <div class="text-slate-900"><%= item[:estimate_hours] ? "#{number_with_precision(item[:estimate_hours], precision: 1)}h" : "—" %></div>
+          <div class="text-slate-900"><%= @mapping.default_hourly_rate ? number_to_currency(@mapping.default_hourly_rate) : "—" %></div>
+          <div class="text-slate-900 font-medium"><%= number_to_currency(amount) %></div>
         </div>
       <% end %>
+
+      <div class="grid grid-cols-[1fr_120px_90px_90px_110px] gap-3 px-4 py-3 border-t border-slate-200 text-sm bg-slate-50 font-semibold text-slate-900">
+        <div class="col-span-4 text-right">Total</div>
+        <div><%= number_to_currency(@total_amount) %></div>
+      </div>
     <% end %>
   </div>
 
-  <div>
+  <div class="flex items-center justify-between">
     <%= link_to "Back to project", invoicing_path(clickup_space_id: @clickup_space_id), class: "text-sm text-slate-500 hover:text-slate-700" %>
+
+    <% if @line_items.any? %>
+      <%= form_with url: invoices_path, method: :post do |form| %>
+        <%= form.hidden_field :clickup_space_id, value: @clickup_space_id %>
+        <% @list_ids.each do |list_id| %>
+          <%= hidden_field_tag "list_ids[]", list_id %>
+        <% end %>
+        <%= form.hidden_field :month, value: @month %>
+        <%= form.submit "Save as Invoice", class: "h-10 px-4 rounded-lg bg-brand-400 hover:bg-brand-500 text-white font-semibold text-sm cursor-pointer" %>
+      <% end %>
+    <% end %>
   </div>
 </div>
