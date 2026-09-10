@@ -8,6 +8,7 @@
     <%= sidebar_link "Home", root_path, icon: "house", active: current_page?(root_path) %>
 
     <%= sidebar_section "Consolidated Data" %>
+    <%= sidebar_link "Meetings", meetings_path, icon: "video-camera", active: controller_name == "meetings" %>
     <%= sidebar_soon "Task 360°", icon: "squares-four" %>
     <%= sidebar_soon "Search", icon: "magnifying-glass" %>
     <%= sidebar_soon "Action Items", icon: "check-square" %>

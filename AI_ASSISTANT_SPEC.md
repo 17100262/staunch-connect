@@ -2,8 +2,8 @@
 
 **Status:** Draft v1
 **Owner:** [you]
-**Last updated:** 2026-09-05
-**Relationship to master spec:** This is the first buildable slice of Section 9 ("Feature: AI Assistant") in `# Consolidated Work-Data Platform — Prod.md`. That section describes the long-run vision — a chat interface with retrieval across all six sources (Hubstaff, ClickUp, Slack, GitHub, Fathom, Gmail). This spec narrows that down to what's actually buildable *today*: invoicing is the only feature with persisted, structured data in the app right now (`invoices`, `invoice_line_items`, `project_mappings` — see Section 15.9 of the master spec), so it's the first domain the assistant answers questions about. Every other source stays a "Soon" concept until its own sync/linking work lands, per the master spec's phasing (Section 14).
+**Last updated:** 2026-09-10
+**Relationship to master spec:** This is the first buildable slice of Section 9 ("Feature: AI Assistant") in `# Consolidated Work-Data Platform — Prod.md`. That section describes the long-run vision — a chat interface with retrieval across all six sources (Hubstaff, ClickUp, Slack, GitHub, Fathom, Gmail). Phase A (below) narrows that down to what was buildable *first*: invoicing was the only feature with persisted, structured data in the app at the time (`invoices`, `invoice_line_items`, `project_mappings` — see Section 15.9 of the master spec). **Phase B (Section 12)** extends the assistant to Fathom meeting data, now that `FATHOM_INTEGRATION_SPEC.md` has shipped a real `meetings` table with synced summaries/transcripts — the second domain with persisted data the assistant can safely answer from. Slack, GitHub, and Gmail remain a "Soon" concept until their own sync/linking work lands, per the master spec's phasing (Section 14).
 
 ---
 
@@ -13,7 +13,7 @@ Right now, answering a question like "what was the total for the August invoice?
 
 **Goal:** Add a chat-style assistant, scoped to the invoicing data that already exists, that can answer ad hoc questions about invoices and their line items in plain English — accurately, using real numbers pulled from the database, not approximated from an LLM's own reasoning.
 
-**Explicitly not this phase's goal:** answering questions about Slack, GitHub, Fathom, Gmail, or ClickUp/Hubstaff data that isn't already persisted as an `Invoice`/`InvoiceLineItem`. Those all depend on sync/linking work that hasn't been built yet (master spec Sections 4–5, 14).
+**Explicitly not this phase's goal:** answering questions about Slack, GitHub, Fathom, Gmail, or ClickUp/Hubstaff data that isn't already persisted as an `Invoice`/`InvoiceLineItem`. Those all depend on sync/linking work that hadn't been built yet at the time (master spec Sections 4–5, 14) — Fathom's has since landed (`FATHOM_INTEGRATION_SPEC.md`) and is covered by Phase B (Section 12); Slack/GitHub/Gmail are still unaddressed.
 
 ---
 
@@ -126,7 +126,7 @@ Storing `tool_calls` alongside each assistant message means any answer can be au
 
 ## 9. Out of scope this phase
 
-- Anything not backed by `invoices`/`invoice_line_items`/`project_mappings` — no Slack, GitHub, Fathom, Gmail, or live ClickUp/Hubstaff API questions yet (that's Phase B/C, once those sources are synced per master spec Section 14).
+- Anything not backed by `invoices`/`invoice_line_items`/`project_mappings` — no Slack, GitHub, Fathom, Gmail, or live ClickUp/Hubstaff API questions yet from *this* phase (Fathom/meetings is now covered by Phase B, Section 12; Slack/GitHub/Gmail remain Phase C+, once those sources are synced per master spec Section 14).
 - The assistant proposing invoice line-item decisions (master spec Section 8's "AI Assistant can propose a default recommendation per line item") — that depends on the 4-way bill decision and variance flagging, which aren't built yet either.
 - Any write access — this assistant only ever reads and reports; it cannot create, edit, or delete an invoice or line item on your behalf.
 - Multi-turn "generate a whole report" style asks beyond a single conversational answer — no scheduled/emailed digests this phase.
@@ -151,3 +151,116 @@ Storing `tool_calls` alongside each assistant message means any answer can be au
 6. Asking something outside this phase's scope (e.g. "what did the client say about this in Slack?") gets a clear "I can't answer that yet — I only have invoicing data right now" response, not a hallucinated answer.
 7. Reloading the chat page after asking a question still shows the prior conversation (persisted via `ai_conversations`/`ai_messages`).
 8. Every assistant reply containing a number can be traced back to the specific invoice(s)/line item(s) it was computed from (via the stored `tool_calls`, or visibly in the reply text itself).
+
+---
+
+## 12. Phase B — Meetings
+
+*Extends the same chat assistant with a second tool provider, `MeetingAssistantTools`, covering the `meetings` table shipped by `FATHOM_INTEGRATION_SPEC.md`. Everything in Sections 1–11 above (the invoicing tools, the chat UI, `ai_conversations`/`ai_messages`) stays exactly as built — this section only adds to the tool surface the model can call.*
+
+### 12.1 Problem & goal
+
+Meetings are now synced with real summaries, transcripts, and action items (`FATHOM_INTEGRATION_SPEC.md`), browsable one at a time in the Meetings module — but "what did we agree to in the call with [client]?" or "what came out of last week's sync with [attendee]?" still means opening the Meetings list and scanning titles/dates by hand.
+
+**Goal:** let the same assistant answer natural-language questions about meeting content — grounded in the actual synced summary/transcript/action-item text, never invented — and always point back to which meeting(s) an answer came from (title + link to Fathom), the same traceability principle Section 6 already applies to invoice numbers.
+
+**Explicitly not this phase's goal:** linking a meeting to a ClickUp task/project (`FATHOM_INTEGRATION_SPEC.md` Section 9 — the linking layer doesn't exist for any source yet), semantic/embedding-based retrieval (Section 12.3 below), or surfacing meeting action items in a standalone Action Items Hub (master spec Section 7.1 — still unbuilt; the assistant can *answer questions* about them without that Hub existing).
+
+### 12.2 Example queries this phase must handle
+
+- "What was discussed in the meeting with [attendee]?"
+- "What did we agree to in the last call with [attendee/client]?"
+- "What are my action items from this week's meetings?"
+- "Did we talk about [topic] in any recent meeting?"
+- "Summarize the meeting from [date]."
+- "Has Fathom finished processing the meeting from this morning?"
+
+### 12.3 Why keyword search over `meetings`, not embeddings — yet
+
+Section 3 already deferred RAG/embeddings for lack of any real unstructured text to search. That's no longer true — transcripts are real prose now — but embeddings are still not the right *next* step, for the same reason Phase 0 kept invoicing simple before building the full reconciliation engine (master spec Section 15): it's real infrastructure (a vector store, a chunking/embedding job, re-embedding on re-sync) to solve a problem this phase's data volume doesn't have yet. `Meeting.search` (built for the Meetings module's own search box) already does a reasonable job matching a query against title and attendee name at the database level; extending the assistant to use the *same* method, plus a plain-text scan of summaries for topic keywords, covers every example query in 12.2 without new infrastructure. Embeddings become worth it once semantic ("about X" without X being a literal word in the transcript) matching across a large meeting history is a real, felt gap — see Open Question 12.10.1.
+
+**Chosen approach, mirroring Section 3's tool-calling pattern exactly:** a small, fixed tool surface — `search_meetings` to find candidate meetings, `get_meeting_summary` for the normal case, `get_meeting_transcript` as an explicit escalation when the summary doesn't have enough detail. The model decides when to escalate; it never receives a raw transcript unless it asked for one.
+
+### 12.4 Tool definitions
+
+| Tool | Arguments | Returns | Backed by |
+|---|---|---|---|
+| `search_meetings` | `query` (optional — matches title or attendee name), `date_from`/`date_to` (optional, `"YYYY-MM-DD"`) | Array of `{id, title, recorded_at, duration_minutes, attendees, processing, fathom_url}` for up to 10 matches, plus a count if more matched | `Meeting.search(query)` (the same method the Meetings index page's search box uses), further scoped by `recorded_at` |
+| `get_meeting_summary` | `id` (required — a `meetings.id` from a prior `search_meetings` call) | `{title, recorded_at, attendees, summary, action_items, processing, fathom_url}` | `Meeting.find` |
+| `get_meeting_transcript` | `id` (required) | `{title, transcript, fathom_url}` — the full transcript text | `Meeting.find` |
+
+All three are read-only. `search_meetings` is deliberately the only discovery path — the model can't call `get_meeting_summary`/`get_meeting_transcript` with a guessed id, only one it already saw returned from a search, the same "never accept a free-floating identifier" discipline Section 4 applies to `project`/`month`.
+
+**Capping `search_meetings` at 10 results:** if a query is vague enough to match more, the assistant should ask a clarifying question (which meeting, or narrow by date) rather than summarizing ten meetings at once — same ambiguity-handling principle as Section 6, applied to a list instead of a single ambiguous match.
+
+**Why summary first, transcript second:** a full transcript can be many thousands of tokens; most questions ("what was decided," "what were the action items") are already answered by Fathom's own summary. Reserving the transcript for an explicit second call keeps the common case cheap and fast, and only pays the larger token cost when the model has already determined the summary doesn't cover what was asked.
+
+### 12.5 Multi-tenancy / scoping
+
+Same as Section 5 — this app is single-user with no permission tiers, so these tools operate over the full `meetings` table with no per-user scoping. Revisit alongside Section 5 if the master spec's multi-user question (Open Question #4) is ever resolved toward real multi-tenancy — and note that meeting content is more sensitive by nature than invoice numbers (master spec Section 12's privacy/retention callout for Fathom specifically), so a future multi-user pass here deserves *more* scrutiny than Section 5's, not the same amount.
+
+### 12.6 Ambiguity, gaps, and honesty
+
+- **No task/project linking exists yet** (Section 12.1) — a question like "what did we discuss about Project X" can only be answered via `search_meetings`' keyword/attendee match against titles and summaries, not a real link to that project. If nothing plausible turns up, say so rather than guessing a meeting is related because its topic sounds similar.
+- **A meeting still processing in Fathom** (`Meeting#processing?` — no summary or transcript yet) must be reported as "still processing," never answered from a blank/absent field as if there were nothing to discuss.
+- **More than 10 matches on a vague query:** ask which meeting, or narrow by date, rather than summarizing all of them (Section 12.4).
+- **The summary alone doesn't answer the question:** call `get_meeting_transcript` before saying "not discussed" — only report an absence after checking the transcript too, not just the summary.
+- **Every content claim must be traceable:** same principle as Section 6's numeric traceability — name the meeting (title + date) and its Fathom link for anything drawn from a summary/transcript, so it can be checked against the original recording in one click.
+
+### 12.7 Architecture
+
+Same shape as Section 7, with the tool dispatcher now spanning two provider classes instead of one:
+
+```
+User types a question (chat UI)
+        │
+        ▼
+Rails controller ──▶ Anthropic API (tool use)
+                          │
+                          │  model picks a tool + arguments
+                          ▼
+           Ruby tool dispatcher — InvoicingAssistantTools
+                          │         + MeetingAssistantTools
+                          │  runs the actual ActiveRecord query
+                          ▼
+        Postgres (invoices/invoice_line_items/project_mappings,
+                   or meetings, depending on the tool called)
+                          │
+                          │  exact result returned to the model
+                          ▼
+                   Model composes the final natural-language reply
+                          │
+                          ▼
+                   Rendered back into the chat UI (Turbo Stream)
+```
+
+- **`AiAssistant` becomes tool-provider-agnostic:** today it hardcodes `InvoicingAssistantTools` in two places (`app/services/ai_assistant.rb` — the `tools:` param sent to the API, and the dispatcher in `tool_results_for`). This phase changes both to merge `InvoicingAssistantTools.definitions + MeetingAssistantTools.definitions`, and to route a tool call to whichever provider actually defines that tool name — a small refactor, not a rewrite; every invoicing tool keeps working exactly as before.
+- **No background jobs, no new infra:** same as Section 7 — a meeting question is answered synchronously within the request, since `search_meetings`/`get_meeting_summary`/`get_meeting_transcript` are all fast, single-table reads.
+
+### 12.8 Data model needed this phase
+
+None — reuses the `meetings` table exactly as `FATHOM_INTEGRATION_SPEC.md` created it. No new columns, no new tables. `ai_conversations`/`ai_messages` are unchanged; a meeting-answering turn's `tool_calls` log just contains `search_meetings`/`get_meeting_summary`/`get_meeting_transcript` entries instead of (or alongside) invoicing ones, same shape as today.
+
+### 12.9 Out of scope this phase
+
+- Linking meetings to ClickUp tasks/projects, or answering with confidence that a meeting is "about" a project without an explicit textual match (Section 12.1/12.6).
+- Semantic/embedding-based retrieval (Section 12.3) — matching stays keyword/attendee-based via `Meeting.search`.
+- A standalone Action Items Hub (master spec Section 7.1) — the assistant can answer "what are my action items from meeting X," but there's still no dedicated UI listing/tracking them across sources.
+- Cross-referencing a meeting with an invoice or Slack/GitHub/Gmail content — those sources still don't exist in this app.
+- Any write access, same as Section 9 — the assistant cannot edit a meeting, mark an action item done, or push anything back to Fathom.
+
+### 12.10 Open questions
+
+1. **When does keyword search stop being good enough?** If "what did we discuss about X" queries keep missing real matches because the transcript uses different words than the question, that's the signal to revisit Section 12.3's embeddings deferral — worth tracking as real usage happens rather than guessing up front.
+2. **Transcript size:** a very long meeting's transcript could still be a lot of tokens even as a single "escalation" call — worth checking real token counts against a handful of your longest synced meetings before assuming `get_meeting_transcript` is always cheap enough to hand to the model whole.
+3. **Action item confidence tiering:** master spec Section 7.1 treats Fathom action items as high-confidence (pull directly) vs. Slack/Gmail-inferred ones (flag as "suggested"). Once another source's action items reach this assistant, should replies distinguish "Fathom said this directly" from "an LLM inferred this from a message" — not urgent while Fathom is the only source, but worth deciding before Phase C adds another one.
+
+### 12.11 Acceptance criteria
+
+1. Asking "What was discussed in the meeting with [attendee]?" (one clear match) finds it via `search_meetings`, answers from its summary, and names the meeting + links to it.
+2. Asking a question a summary doesn't cover triggers a `get_meeting_transcript` call and answers from the actual transcript content, not just the summary.
+3. Asking about a meeting/topic with no matching meeting returns a plain "no matching meeting found" answer, never a fabricated one.
+4. A vague query matching more than 10 meetings prompts a clarifying question (which meeting, or narrow by date) instead of summarizing all of them.
+5. Asking about a meeting still processing in Fathom says so explicitly, rather than treating a blank summary/transcript as "nothing was discussed."
+6. Every reply that draws on meeting content names the meeting and includes a way back to it (its Fathom link).
+7. Every invoicing question from Sections 1–11 still works exactly as before — the merged tool surface is additive, not a regression.

@@ -5,6 +5,12 @@ Rails.application.routes.draw do
     member { post :sync }
   end
 
+  resources :meetings, only: %i[index show]
+
+  namespace :webhooks do
+    post "fathom", to: "fathom#create"
+  end
+
   get "invoicing", to: "invoices#new", as: :invoicing
   get "invoicing/draft", to: "invoices#draft", as: :invoicing_draft
   resources :invoices, only: %i[index create show update destroy] do

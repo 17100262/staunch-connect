@@ -1,12 +1,11 @@
 <% content_for :title, "Connector Settings" %>
 <% content_for :subtitle do %>Manage source connections, sync, and access<% end %>
 
-<% icons = { "hubstaff" => "clock-counter-clockwise", "clickup" => "check-square-offset" } %>
-<% auth_labels = { "hubstaff" => "Personal Token", "clickup" => "Personal Token" } %>
+<% icons = { "hubstaff" => "clock-counter-clockwise", "clickup" => "check-square-offset", "fathom" => "video-camera" } %>
+<% auth_labels = { "hubstaff" => "Personal Token", "clickup" => "Personal Token", "fathom" => "API Key" } %>
 <% soon_sources = [
   { name: "Slack", icon: "slack-logo" },
   { name: "GitHub", icon: "github-logo" },
-  { name: "Fathom", icon: "video-camera" },
   { name: "Gmail", icon: "envelope-simple" }
 ] %>
 
@@ -37,6 +36,7 @@
                   case status
                   when "connected" then "bg-green-100 text-green-700"
                   when "error" then "bg-red-100 text-red-700"
+                  when "syncing" then "bg-blue-100 text-blue-700"
                   else "bg-slate-200 text-slate-700"
                   end
                 %>">
@@ -44,7 +44,9 @@
                 </span>
               </div>
               <div class="text-[13px] text-slate-600 mt-0.5">
-                <% if status == "connected" %>
+                <% if status == "syncing" %>
+                  Syncing in the background&hellip;
+                <% elsif status == "connected" %>
                   Connected &middot; last synced <%= time_ago_in_words(connection.last_used_at) %> ago
                 <% elsif status == "error" %>
                   <%= connection.last_error %>
@@ -64,9 +66,19 @@
             </span>
           </div>
 
+          <% if source == "fathom" && connection&.connected? %>
+            <div class="text-[13px] text-slate-600 -mt-1">
+              <% if connection.webhook_id.present? %>
+                <i class="ph ph-check-circle text-green-600"></i> Webhook registered &mdash; new meetings sync automatically
+              <% else %>
+                <i class="ph ph-warning text-amber-600"></i> No webhook registered &mdash; use Sync Now to pull meetings
+              <% end %>
+            </div>
+          <% end %>
+
           <div class="flex items-center justify-end gap-2 flex-wrap pt-2 border-t border-slate-200">
             <% if connection.present? %>
-              <%= button_to "Sync Now", sync_connection_path(connection), method: :post, class: "h-8 px-3 rounded-lg text-sm font-semibold bg-white border border-slate-200 text-slate-900 hover:bg-slate-50 cursor-pointer" %>
+              <%= button_to connection.syncing? ? "Syncing…" : "Sync Now", sync_connection_path(connection), method: :post, disabled: connection.syncing?, class: "h-8 px-3 rounded-lg text-sm font-semibold bg-white border border-slate-200 text-slate-900 hover:bg-slate-50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" %>
               <%= button_to "Disconnect", connection_path(connection), method: :delete, class: "h-8 px-3 rounded-lg text-sm font-semibold bg-transparent text-red-600 hover:bg-slate-100 cursor-pointer", form: { data: { turbo_confirm: "Disconnect #{source.capitalize}?" } } %>
             <% end %>
           </div>

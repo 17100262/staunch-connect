@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_07_194524) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_10_150001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -42,6 +42,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_07_194524) do
     t.string "source"
     t.string "status"
     t.datetime "updated_at", null: false
+    t.string "webhook_id"
+    t.text "webhook_secret"
   end
 
   create_table "invoice_line_items", force: :cascade do |t|
@@ -66,6 +68,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_07_194524) do
     t.datetime "updated_at", null: false
     t.index ["project_mapping_id", "month"], name: "index_invoices_on_project_mapping_id_and_month", unique: true
     t.index ["project_mapping_id"], name: "index_invoices_on_project_mapping_id"
+  end
+
+  create_table "meetings", force: :cascade do |t|
+    t.jsonb "action_items", default: [], null: false
+    t.jsonb "attendees", default: [], null: false
+    t.datetime "created_at", null: false
+    t.integer "duration_minutes"
+    t.string "fathom_recording_id", null: false
+    t.string "fathom_url"
+    t.jsonb "raw_payload"
+    t.datetime "recorded_at"
+    t.text "summary"
+    t.datetime "synced_at"
+    t.string "title"
+    t.text "transcript"
+    t.datetime "updated_at", null: false
+    t.index ["fathom_recording_id"], name: "index_meetings_on_fathom_recording_id", unique: true
   end
 
   create_table "project_mappings", force: :cascade do |t|
