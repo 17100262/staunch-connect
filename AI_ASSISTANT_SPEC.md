@@ -1,9 +1,13 @@
 # AI Assistant — Spec (Phase A: Invoicing)
 
-**Status:** Draft v1
+**Status:** Phase A and Phase B shipped
 **Owner:** [you]
 **Last updated:** 2026-09-10
 **Relationship to master spec:** This is the first buildable slice of Section 9 ("Feature: AI Assistant") in `# Consolidated Work-Data Platform — Prod.md`. That section describes the long-run vision — a chat interface with retrieval across all six sources (Hubstaff, ClickUp, Slack, GitHub, Fathom, Gmail). Phase A (below) narrows that down to what was buildable *first*: invoicing was the only feature with persisted, structured data in the app at the time (`invoices`, `invoice_line_items`, `project_mappings` — see Section 15.9 of the master spec). **Phase B (Section 12)** extends the assistant to Fathom meeting data, now that `FATHOM_INTEGRATION_SPEC.md` has shipped a real `meetings` table with synced summaries/transcripts — the second domain with persisted data the assistant can safely answer from. Slack, GitHub, and Gmail remain a "Soon" concept until their own sync/linking work lands, per the master spec's phasing (Section 14).
+
+**As actually implemented, Phase B grew two pieces beyond Section 12's original design** (both driven by gaps found while implementing, not scope creep for its own sake):
+- **`search_action_items`** — a 4th tool, added because "what are my action items from this week's meetings" would otherwise force one `get_meeting_summary` call per matched meeting. It scans across meetings in one call, filtered by `assignee` (name or email) and `completed`. Paired with an identity line in the system prompt (`AiAssistant#system_prompt`, naming the logged-in user's email) so "my action items" actually resolves to someone.
+- **`search_meeting_content` — real semantic search, not deferred.** Section 12.3 originally deferred embeddings for lack of a felt need; implementing Section 12 surfaced a concrete one — `search_meetings`/`Meeting.search` only match a title or attendee name, so "which meeting discussed X" was unanswerable for any X not literally in a title. Fixed with Voyage AI embeddings (`voyage-4`, confirmed effectively free at this app's volume via live-fetched pricing — 200M free tokens/account against ~1.6M tokens to embed all 239 meetings) stored in a new `transcript_chunks` table (pgvector via the `neighbor` gem), populated by `EmbedMeetingJob` on every sync (`Fathom::MeetingSync`) and backfilled via `bin/rails embeddings:backfill`. Verified end-to-end against real synced data — e.g. correctly found a meeting discussing AWS IAM permissions and budget/pricing concerns across several meetings, in neither case because the topic appeared in a title.
 
 ---
 
@@ -164,7 +168,9 @@ Meetings are now synced with real summaries, transcripts, and action items (`FAT
 
 **Goal:** let the same assistant answer natural-language questions about meeting content — grounded in the actual synced summary/transcript/action-item text, never invented — and always point back to which meeting(s) an answer came from (title + link to Fathom), the same traceability principle Section 6 already applies to invoice numbers.
 
-**Explicitly not this phase's goal:** linking a meeting to a ClickUp task/project (`FATHOM_INTEGRATION_SPEC.md` Section 9 — the linking layer doesn't exist for any source yet), semantic/embedding-based retrieval (Section 12.3 below), or surfacing meeting action items in a standalone Action Items Hub (master spec Section 7.1 — still unbuilt; the assistant can *answer questions* about them without that Hub existing).
+**Explicitly not this phase's goal:** linking a meeting to a ClickUp task/project (`FATHOM_INTEGRATION_SPEC.md` Section 9 — the linking layer doesn't exist for any source yet), or surfacing meeting action items in a standalone Action Items Hub (master spec Section 7.1 — still unbuilt; the assistant can *answer questions* about them without that Hub existing).
+
+**As implemented, semantic/embedding-based retrieval turned out to be in scope after all** — see 12.3's "as implemented" note below for why the original deferral didn't survive contact with the rest of this section's own example queries.
 
 ### 12.2 Example queries this phase must handle
 
@@ -181,6 +187,12 @@ Section 3 already deferred RAG/embeddings for lack of any real unstructured text
 
 **Chosen approach, mirroring Section 3's tool-calling pattern exactly:** a small, fixed tool surface — `search_meetings` to find candidate meetings, `get_meeting_summary` for the normal case, `get_meeting_transcript` as an explicit escalation when the summary doesn't have enough detail. The model decides when to escalate; it never receives a raw transcript unless it asked for one.
 
+**As implemented — this section's conclusion changed, and here's exactly why:** `Meeting.search` only ever matches a `title` or an attendee's `"name"` — never the summary/transcript body (confirmed by reading `app/models/meeting.rb` directly, not assumed). That means "did we talk about [topic] in any recent meeting?" — one of this very section's own example queries (12.2) — was **structurally unanswerable** by the keyword-only design above, for any topic that doesn't happen to be in a title. That's not a "keyword search stops being good enough" scenario (Open Question 12.10.1 as originally written) — it's a hole from day one. Two more things changed the calculus versus when this section was first drafted:
+- **Real pricing, fetched live rather than assumed:** Voyage AI's current-gen embedding models (`voyage-4`) give 200M free tokens/account; this app's entire 239-meeting backfill is ~1.6M tokens — about 0.8% of the free allowance. The "real infrastructure to solve a problem this phase's data volume doesn't have" framing above was right about the infrastructure cost, but the token cost turned out to be a non-issue at this volume, not a reason to wait.
+- **pgvector is a Postgres extension, not a separate service** — `enable_extension "vector"` plus the `neighbor` gem gets ActiveRecord-native nearest-neighbor search with no new infrastructure service to run/operate, which is a meaningfully smaller lift than "a vector store" implied when this section was first written.
+
+Built as a 5th tool, `search_meeting_content` (Section 12.4) — semantic search over chunked summaries/transcripts, verified end-to-end against real synced meetings (e.g. correctly found the meeting discussing AWS IAM permissions, and separately found three distinct meetings raising pricing/budget concerns — in neither case because the topic was in a title).
+
 ### 12.4 Tool definitions
 
 | Tool | Arguments | Returns | Backed by |
@@ -193,7 +205,19 @@ All three are read-only. `search_meetings` is deliberately the only discovery pa
 
 **Capping `search_meetings` at 10 results:** if a query is vague enough to match more, the assistant should ask a clarifying question (which meeting, or narrow by date) rather than summarizing ten meetings at once — same ambiguity-handling principle as Section 6, applied to a list instead of a single ambiguous match.
 
-**Why summary first, transcript second:** a full transcript can be many thousands of tokens; most questions ("what was decided," "what were the action items") are already answered by Fathom's own summary. Reserving the transcript for an explicit second call keeps the common case cheap and fast, and only pays the larger token cost when the model has already determined the summary doesn't cover what was asked.
+**Why summary first, transcript second:** a full transcript can be many thousands of tokens; most questions ("what was decided," "what were the action items") are already answered by Fathom's own summary. Reserving the transcript for an explicit second call keeps the common case cheap and fast, and only pays the larger token cost when the model has already determined the summary doesn't cover what was asked. **As implemented, this was checked against real data rather than assumed:** the longest synced transcript is ~90K chars (~22.5K tokens), average ~21K chars (~5.3K tokens) — comfortably cheap for Opus 5's context window even on an escalation call, resolving Open Question 12.10.2 below.
+
+**As implemented — two more tools, added for gaps found while building this:**
+
+| Tool | Arguments | Returns | Backed by |
+|---|---|---|---|
+| `search_action_items` | `query`/`date_from`/`date_to` (same as `search_meetings`), `assignee` (optional — matches an action item's assignee name *or* email, case-insensitive substring), `completed` (optional boolean — open vs. done) | `{total_meetings_scanned, total_action_items, action_items: [...]}`, each item `{meeting_id, meeting_title, recorded_at, fathom_url, description, assignee, completed, timestamp, playback_url}` | Scans matching meetings' `action_items` jsonb directly, capped at 50 meetings/50 items |
+| `search_meeting_content` | `query` (required — natural language), `date_from`/`date_to` (optional) | Top 8 `{meeting_id, meeting_title, recorded_at, fathom_url, source ("summary"/"transcript"), excerpt, relevance}` results, ranked by cosine similarity | `TranscriptChunk.nearest_neighbors(:embedding, query_embedding, distance: "cosine")` (`neighbor` gem over pgvector) |
+
+- **Why `search_action_items` exists:** "what are my action items from this week's meetings" (Section 12.2's own example) would otherwise force one `get_meeting_summary` call per matched meeting — doesn't scale, and risks `AiAssistant::MAX_TOOL_ITERATIONS` on a busy week. One call, scanning across meetings, fixes both. `assignee` is what lets "my action items" resolve to anything at all — paired with a new identity line in `AiAssistant#system_prompt` naming the logged-in user's email, since nothing previously told the model who was asking.
+- **Why `search_meeting_content` exists:** see 12.3's "as implemented" note — `search_meetings` can't find a meeting by what was discussed in it, only by title/attendee. This tool embeds the query (`VoyageClient#embed_query`, `input_type: "query"`) and searches pre-embedded chunks (`VoyageClient#embed_documents`, `input_type: "document"`, populated by `EmbedMeetingJob` — see Section 12.8). Voyage's embeddings are asymmetric between these two `input_type`s, so using the right one on each side isn't just documentation, it materially affects retrieval quality.
+- **Chunking (`MeetingChunker`):** summaries split on markdown `## ` section headers (falling back to one chunk if none found — most are small enough, ~1.5K tokens average, that this rarely produces more than a couple); transcripts walked line-by-line, accumulating whole `"Speaker: text"` lines into a chunk until ~3,200 characters, never splitting a line mid-sentence. Verified against the largest real transcript: 28 transcript chunks + 4 summary chunks.
+- **A weak semantic match must be treated as inconclusive, not an answer** — `relevance` (`1 - cosine_distance`) is returned specifically so the model (and `AiAssistant#system_prompt`) can tell "the best match I found is a stretch" from "this is clearly the meeting," rather than confidently asserting a low-relevance chunk is the answer.
 
 ### 12.5 Multi-tenancy / scoping
 
@@ -206,6 +230,8 @@ Same as Section 5 — this app is single-user with no permission tiers, so these
 - **More than 10 matches on a vague query:** ask which meeting, or narrow by date, rather than summarizing all of them (Section 12.4).
 - **The summary alone doesn't answer the question:** call `get_meeting_transcript` before saying "not discussed" — only report an absence after checking the transcript too, not just the summary.
 - **Every content claim must be traceable:** same principle as Section 6's numeric traceability — name the meeting (title + date) and its Fathom link for anything drawn from a summary/transcript, so it can be checked against the original recording in one click.
+- **As implemented — two more honesty rules, for the two new tools:** a `search_meeting_content` match with low `relevance` must be reported as inconclusive rather than asserted as the answer (verified: asking about AWS IAM permissions, the assistant correctly named a second, weakly-related meeting as "touches on AWS only in passing... not the answer" rather than treating it as a second hit). And for cross-meeting questions, use `search_action_items` rather than looping `get_meeting_summary` per meeting — looping doesn't just waste calls, it risks silently hitting `MAX_TOOL_ITERATIONS` before covering every matched meeting.
+- **Known, deliberate limitation, not fixed this pass:** `Fathom::MeetingSync` discards each transcript segment's timestamp when flattening it into one string (keeps only speaker+text). So a transcript-grounded answer can name the meeting and link to `fathom_url` (the recording as a whole), but can't deep-link to the exact moment discussed — unlike action items, which keep their own `recording_timestamp`/`recording_playback_url`. Revisit only if this turns out to matter in practice; fixing it means restructuring `meetings.transcript` storage, touching the sync code and the Meetings show page too, not just the assistant.
 
 ### 12.7 Architecture
 
@@ -235,25 +261,41 @@ Rails controller ──▶ Anthropic API (tool use)
 ```
 
 - **`AiAssistant` becomes tool-provider-agnostic:** today it hardcodes `InvoicingAssistantTools` in two places (`app/services/ai_assistant.rb` — the `tools:` param sent to the API, and the dispatcher in `tool_results_for`). This phase changes both to merge `InvoicingAssistantTools.definitions + MeetingAssistantTools.definitions`, and to route a tool call to whichever provider actually defines that tool name — a small refactor, not a rewrite; every invoicing tool keeps working exactly as before.
-- **No background jobs, no new infra:** same as Section 7 — a meeting question is answered synchronously within the request, since `search_meetings`/`get_meeting_summary`/`get_meeting_transcript` are all fast, single-table reads.
+- **No background jobs, no new infra — for the 3 keyword/structured tools.** `search_meetings`/`get_meeting_summary`/`get_meeting_transcript`/`search_action_items` are all fast, single-table reads answered synchronously within the request, same as invoicing.
+
+**As implemented:**
+- `AiAssistant::TOOL_PROVIDERS = [InvoicingAssistantTools, MeetingAssistantTools].freeze` — a name→provider lookup (`tools_by_name`, memoized per `ask` call) replaces the old single-provider dispatch, falling back to an "unknown tool" error for anything unrecognized rather than silently misrouting.
+- `SYSTEM_PROMPT` changed from a frozen class constant to a `system_prompt` instance method — needed to interpolate the conversation's user (for the "my action items" identity rule above) fresh per call, which also incidentally fixed a latent bug: the constant's `Date.current` interpolation only evaluated once at class-load time, so "today" could silently go stale between deploys in production.
+- **`search_meeting_content` is the one tool that isn't a fast synchronous read on its own — it makes a live Voyage API call per question** (to embed the query) before the pgvector search. Still answered synchronously within the request (no background job for the *query* side); the background job (`EmbedMeetingJob`) is only on the *indexing* side, described in 12.8.
 
 ### 12.8 Data model needed this phase
 
-None — reuses the `meetings` table exactly as `FATHOM_INTEGRATION_SPEC.md` created it. No new columns, no new tables. `ai_conversations`/`ai_messages` are unchanged; a meeting-answering turn's `tool_calls` log just contains `search_meetings`/`get_meeting_summary`/`get_meeting_transcript` entries instead of (or alongside) invoicing ones, same shape as today.
+For `search_meetings`/`get_meeting_summary`/`get_meeting_transcript`/`search_action_items`: none — reuses the `meetings` table exactly as `FATHOM_INTEGRATION_SPEC.md` created it. `ai_conversations`/`ai_messages` are unchanged; a meeting-answering turn's `tool_calls` log just contains these tool names instead of (or alongside) invoicing ones, same shape as today.
+
+**As implemented — `search_meeting_content` needed real infrastructure, described here rather than treated as a footnote:**
+- **`transcript_chunks` table** (`meeting_id`, `source` — `"summary"`/`"transcript"`, `chunk_index`, `content`, `embedding` — a `vector(1024)` column). `pgvector` enabled via `enable_extension "vector"` (installed locally as `brew install pgvector` for this app to actually run — not present in this dev Postgres before this phase; production hosting for the extension is still undetermined, since no `config/deploy.yml` exists yet).
+- **`Meeting has_many :transcript_chunks, dependent: :destroy`.**
+- **`VoyageClient`** (`app/services/voyage_client.rb`) — a hand-rolled `Net::HTTP` client, same convention as `ClickupClient`/`HubstaffClient`/`FathomClient`, calling Voyage AI's embeddings endpoint (`voyage-4`, 1024 dimensions). Retries 429s with backoff exactly like `FathomClient` already does — needed in practice: this account's Voyage API key was rate-limited to 3 requests/minute (an unverified-account default; Voyage's own error message says so directly) until a payment method was added, at which point it jumped to the standard 2,000 RPM tier — the 200M free tokens apply either way, this was purely an anti-abuse gate, not a cost decision.
+- **`EmbedMeetingJob`** — embeds a meeting's chunks (one batched Voyage call per meeting, not one per chunk) and replaces its `transcript_chunks`. Enqueued from `Fathom::MeetingSync` right after `meeting.save!`, only when `saved_change_to_summary?`/`saved_change_to_transcript?` — so both the webhook and backfill sync paths pick it up automatically, and a resync with unchanged content doesn't re-embed for nothing.
+- **`bin/rails embeddings:backfill`** — a rake task (not `perform_later`, deliberately synchronous with a 1-second pace between meetings) for embedding meetings that predate this feature. Run once against all 239 meetings already in this dev DB: 2,607 chunks created (941 summary + 1,666 transcript), zero gaps, in about 16.5 minutes.
 
 ### 12.9 Out of scope this phase
 
 - Linking meetings to ClickUp tasks/projects, or answering with confidence that a meeting is "about" a project without an explicit textual match (Section 12.1/12.6).
-- Semantic/embedding-based retrieval (Section 12.3) — matching stays keyword/attendee-based via `Meeting.search`.
-- A standalone Action Items Hub (master spec Section 7.1) — the assistant can answer "what are my action items from meeting X," but there's still no dedicated UI listing/tracking them across sources.
+- ~~Semantic/embedding-based retrieval (Section 12.3) — matching stays keyword/attendee-based via `Meeting.search`.~~ **As implemented: built, not deferred — see 12.3/12.4/12.8.**
+- Deep-linking a transcript-grounded answer to the exact moment discussed (only the meeting as a whole, via `fathom_url`) — see the "known, deliberate limitation" note in Section 12.6.
+- A standalone Action Items Hub (master spec Section 7.1) — the assistant can answer "what are my action items from meeting X" (or across several meetings, via `search_action_items`), but there's still no dedicated UI listing/tracking them across sources.
 - Cross-referencing a meeting with an invoice or Slack/GitHub/Gmail content — those sources still don't exist in this app.
 - Any write access, same as Section 9 — the assistant cannot edit a meeting, mark an action item done, or push anything back to Fathom.
 
 ### 12.10 Open questions
 
-1. **When does keyword search stop being good enough?** If "what did we discuss about X" queries keep missing real matches because the transcript uses different words than the question, that's the signal to revisit Section 12.3's embeddings deferral — worth tracking as real usage happens rather than guessing up front.
-2. **Transcript size:** a very long meeting's transcript could still be a lot of tokens even as a single "escalation" call — worth checking real token counts against a handful of your longest synced meetings before assuming `get_meeting_transcript` is always cheap enough to hand to the model whole.
+1. ~~**When does keyword search stop being good enough?**~~ **Resolved — didn't wait for it to become a felt gap.** Reading this section's own example queries against the real `Meeting.search` implementation showed the gap was structural, not usage-dependent (Section 12.3's "as implemented" note) — built `search_meeting_content` instead of waiting to observe the pain.
+2. ~~**Transcript size**~~ **Resolved, checked against real data:** longest ~90K chars (~22.5K tokens), average ~21K chars (~5.3K tokens) — trivially cheap either as a whole `get_meeting_transcript` call or chunked for embedding.
 3. **Action item confidence tiering:** master spec Section 7.1 treats Fathom action items as high-confidence (pull directly) vs. Slack/Gmail-inferred ones (flag as "suggested"). Once another source's action items reach this assistant, should replies distinguish "Fathom said this directly" from "an LLM inferred this from a message" — not urgent while Fathom is the only source, but worth deciding before Phase C adds another one.
+4. **Chunk size tuning:** `MeetingChunker`'s ~3,200-character transcript window and markdown-header-based summary split were reasonable starting points, not tuned against a retrieval eval — worth revisiting if `search_meeting_content` misses things in practice (e.g. a topic split awkwardly across a chunk boundary).
+5. **Voyage account tier for future environments:** this dev account needed a payment method added before the standard 2,000 RPM tier applied (started at an unverified-account default of 3 RPM/10K TPM) — the 200M free tokens apply regardless, but a fresh staging/production Voyage account will hit the same gate on its first backfill unless a payment method is added ahead of time.
+6. **Production hosting for pgvector:** no `config/deploy.yml` exists yet (Kamal is an unconfigured default gem) — whatever Postgres ends up hosting production needs the `vector` extension available. Not a blocker now; flag it when deployment is actually set up.
 
 ### 12.11 Acceptance criteria
 
@@ -264,3 +306,11 @@ None — reuses the `meetings` table exactly as `FATHOM_INTEGRATION_SPEC.md` cre
 5. Asking about a meeting still processing in Fathom says so explicitly, rather than treating a blank summary/transcript as "nothing was discussed."
 6. Every reply that draws on meeting content names the meeting and includes a way back to it (its Fathom link).
 7. Every invoicing question from Sections 1–11 still works exactly as before — the merged tool surface is additive, not a regression.
+
+**As implemented — verified live against this dev DB's 239 real synced meetings (not just described):**
+
+8. Asking "Which meeting talked about AWS IAM roles?" (a topic never in any meeting's title) uses `search_meeting_content` and correctly finds/cites the right meeting — confirmed working, including correctly naming a second, weakly-related meeting as *not* the answer rather than treating it as a match.
+9. Asking "Has anyone raised pricing/budget concerns in any meeting?" (the paraphrase/synonym case, not a literal keyword match) correctly surfaces multiple distinct real meetings and distinguishes an actual concern from routine pricing discussion.
+10. Asking "What are my open action items from the meeting with Usman?" — with 19 meetings matching "Usman" — correctly asks for clarification, uses `search_action_items` filtered to the logged-in user's identity (from `AiAssistant#system_prompt`) rather than every attendee's items, and (unprompted) flags that "Usman" spans two different people in the matched meetings.
+11. Every invoicing question from Sections 1–11 still works unchanged after the `TOOL_PROVIDERS` dispatch refactor — re-verified, not just assumed additive.
+12. `bin/rails embeddings:backfill` against all 239 existing meetings completes with zero gaps (every meeting with a summary or transcript has `transcript_chunks`).

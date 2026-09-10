@@ -32,6 +32,7 @@ module Fathom
         synced_at: Time.current
       )
       meeting.save!
+      EmbedMeetingJob.perform_later(meeting.id) if meeting.saved_change_to_summary? || meeting.saved_change_to_transcript?
       meeting
     end
 

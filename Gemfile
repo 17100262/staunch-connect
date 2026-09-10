@@ -51,6 +51,9 @@ gem "anthropic"
 # Renders Fathom's markdown meeting summaries [https://github.com/vmg/redcarpet]
 gem "redcarpet"
 
+# ActiveRecord/pgvector integration, used for semantic search over meeting content [https://github.com/ankane/neighbor]
+gem "neighbor"
+
 group :development, :test do
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[ mri windows ], require: "debug/prelude"

@@ -1,4 +1,6 @@
 class Meeting < ApplicationRecord
+  has_many :transcript_chunks, dependent: :destroy
+
   validates :fathom_recording_id, presence: true, uniqueness: true
 
   # Matches on title or any attendee's name (attendees is a jsonb array of
