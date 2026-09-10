@@ -4,6 +4,9 @@ class InvoicesController < ApplicationController
     HubstaffClient::AuthenticationError, HubstaffClient::RequestError
   ].freeze
 
+  TICKET_NUMBER_FIELD_NAMES = [ "harper ticket number", "ticket number", "htn" ].freeze
+  NO_FOLDER = "none"
+
   before_action :require_connections, only: %i[new draft create]
 
   def index
@@ -12,20 +15,26 @@ class InvoicesController < ApplicationController
 
   def new
     @clickup_space_id = params[:clickup_space_id]
+    @clickup_folder_id = params[:clickup_folder_id]
 
     if @clickup_space_id.blank?
       @spaces = clickup_client.spaces(team_id)
       template = :project_picker
+    elsif @clickup_folder_id.blank?
+      @clickup_space_name = params[:clickup_space_name]
+      @folders = clickup_client.folders(@clickup_space_id)
+      @folderless_lists = clickup_client.lists(@clickup_space_id)
+      template = :folder_picker
     else
-      @mapping = ProjectMapping.find_by(clickup_space_id: @clickup_space_id)
+      @mapping = find_mapping(@clickup_folder_id, @clickup_space_id)
 
       if @mapping.nil?
         @clickup_space_name = params[:clickup_space_name]
+        @clickup_folder_name = params[:clickup_folder_name]
         @hubstaff_project_options = hubstaff_project_options
         template = :project_mapping
       else
-        @folders = clickup_client.folders(@clickup_space_id)
-        @folderless_lists = clickup_client.lists(@clickup_space_id)
+        @lists = lists_for_folder(@clickup_space_id, @clickup_folder_id)
         template = :list_picker
       end
     end
@@ -39,16 +48,17 @@ class InvoicesController < ApplicationController
 
   def draft
     @clickup_space_id = params[:clickup_space_id]
+    @clickup_folder_id = params[:clickup_folder_id]
     @list_ids = Array(params[:list_ids]).reject(&:blank?)
 
-    if @clickup_space_id.blank? || @list_ids.empty?
+    if @clickup_space_id.blank? || @clickup_folder_id.blank? || @list_ids.empty?
       return redirect_to invoicing_path, alert: "Select a project and at least one list first."
     end
 
-    @mapping = ProjectMapping.find_by(clickup_space_id: @clickup_space_id)
+    @mapping = find_mapping(@clickup_folder_id, @clickup_space_id)
 
     if @mapping.nil?
-      return redirect_to invoicing_path(clickup_space_id: @clickup_space_id), alert: "Map this project to a Hubstaff project first."
+      return redirect_to invoicing_path(clickup_space_id: @clickup_space_id, clickup_folder_id: @clickup_folder_id), alert: "Map this project to a Hubstaff project first."
     end
 
     @month = params[:month].presence || Date.current.strftime("%Y-%m")
@@ -56,7 +66,8 @@ class InvoicesController < ApplicationController
     month_start = Date.strptime(@month, "%Y-%m")
     month_end = month_start.end_of_month
 
-    @line_items = @list_ids.flat_map { |list_id| clickup_client.tasks(list_id) }.map { |task| build_line_item(task) }
+    top_level_tasks, subtasks_by_parent = partition_tasks(@list_ids.flat_map { |list_id| clickup_client.tasks(list_id) })
+    @line_items = top_level_tasks.map { |task| build_line_item(task, subtasks_by_parent[task["id"]] || []) }
     @total_estimate_hours = @line_items.sum { |item| item[:estimate_hours] || 0 }
     @total_amount = @line_items.sum { |item| (item[:estimate_hours] || 0) * (@mapping.default_hourly_rate || 0) }
 
@@ -77,17 +88,18 @@ class InvoicesController < ApplicationController
 
   def create
     clickup_space_id = params[:clickup_space_id]
+    clickup_folder_id = params[:clickup_folder_id]
     list_ids = Array(params[:list_ids]).reject(&:blank?)
     month = params[:month].presence || Date.current.strftime("%Y-%m")
 
-    if clickup_space_id.blank? || list_ids.empty?
+    if clickup_space_id.blank? || clickup_folder_id.blank? || list_ids.empty?
       return redirect_to invoicing_path, alert: "Select a project and at least one list first."
     end
 
-    mapping = ProjectMapping.find_by(clickup_space_id: clickup_space_id)
+    mapping = find_mapping(clickup_folder_id, clickup_space_id)
 
     if mapping.nil?
-      return redirect_to invoicing_path(clickup_space_id: clickup_space_id), alert: "Map this project to a Hubstaff project first."
+      return redirect_to invoicing_path(clickup_space_id: clickup_space_id, clickup_folder_id: clickup_folder_id), alert: "Map this project to a Hubstaff project first."
     end
 
     invoice = Invoice.find_by(project_mapping: mapping, month: month)
@@ -119,13 +131,19 @@ class InvoicesController < ApplicationController
     invoice = Invoice.find(params[:id])
 
     package = Axlsx::Package.new
+    wrap_style = package.workbook.styles.add_style(alignment: { wrap_text: true, vertical: :top })
+
     package.workbook.add_worksheet(name: "Invoice") do |sheet|
-      sheet.add_row [ "Task", "Ticket", "Hours", "Rate", "Amount" ]
+      sheet.add_row [ "Task", "Ticket", "Hours", "Rate", "Amount", "Notes" ]
       invoice.invoice_line_items.where(billable: true).each do |item|
-        sheet.add_row [ item.title, item.ticket, item.estimate_hours, item.hourly_rate, item.amount ]
+        sheet.add_row(
+          [ item.title, item.ticket, item.estimate_hours, item.hourly_rate, item.amount, item.notes ],
+          style: [ nil, nil, nil, nil, nil, wrap_style ]
+        )
       end
       sheet.add_row []
       sheet.add_row [ nil, nil, nil, "Total", invoice.total_amount ]
+      sheet.column_widths nil, nil, nil, nil, nil, 50
     end
 
     filename = "invoice-#{invoice.name}-#{invoice.month}".parameterize(separator: "-") + ".xlsx"
@@ -135,25 +153,73 @@ class InvoicesController < ApplicationController
   private
 
   def invoice_params
-    params.require(:invoice).permit(:name, invoice_line_items_attributes: %i[id title hourly_rate billable])
+    params.require(:invoice).permit(:name, invoice_line_items_attributes: %i[id title hourly_rate billable notes])
+  end
+
+  # A folder maps to one project uniquely; the "No Folder" bucket (folderless
+  # lists sitting directly in a Space) falls back to one shared mapping per
+  # Space, matching how ProjectMapping's uniqueness validations are scoped.
+  def find_mapping(folder_id, space_id)
+    if folder_id == NO_FOLDER
+      ProjectMapping.find_by(clickup_space_id: space_id, clickup_folder_id: nil)
+    else
+      ProjectMapping.find_by(clickup_folder_id: folder_id)
+    end
+  end
+
+  def lists_for_folder(space_id, folder_id)
+    if folder_id == NO_FOLDER
+      clickup_client.lists(space_id)
+    else
+      clickup_client.folders(space_id).find { |f| f["id"] == folder_id }&.fetch("lists", []) || []
+    end
   end
 
   def build_invoice(mapping, month, list_ids)
-    tasks = list_ids.flat_map { |list_id| clickup_client.tasks(list_id) }
-    name = mapping.clickup_space_name.presence || mapping.clickup_space_id
+    top_level_tasks, subtasks_by_parent = partition_tasks(list_ids.flat_map { |list_id| clickup_client.tasks(list_id) })
+    name = mapping.clickup_folder_name.presence || mapping.clickup_space_name.presence || mapping.clickup_space_id
 
     Invoice.create!(project_mapping: mapping, month: month, name: name) do |invoice|
-      tasks.each do |task|
+      top_level_tasks.each do |task|
         invoice.invoice_line_items.build(
           clickup_task_id: task["id"],
-          title: task["name"],
+          title: titled_with_ticket_number(task),
           ticket: task["custom_id"].presence || task["id"],
           estimate_hours: task["time_estimate"] ? task["time_estimate"] / 3_600_000.0 : 0,
           hourly_rate: mapping.default_hourly_rate,
-          billable: true
+          billable: true,
+          notes: format_subtask_notes(subtasks_by_parent[task["id"]] || [])
         )
       end
     end
+  end
+
+  # ClickUp returns a task's subtasks as flat siblings in the same list, marked
+  # with a "parent" field pointing back to the parent task's id (nil for top-level
+  # tasks) — this splits that flat array back into parent/child groups.
+  def partition_tasks(tasks)
+    subtasks_by_parent = tasks.select { |t| t["parent"] }.group_by { |t| t["parent"] }
+    top_level_tasks = tasks.reject { |t| t["parent"] }
+    [ top_level_tasks, subtasks_by_parent ]
+  end
+
+  def format_subtask_notes(subtasks)
+    return nil if subtasks.empty?
+
+    subtasks.map { |t| "• #{titled_with_ticket_number(t)}" }.join("\n")
+  end
+
+  # Merges a ClickUp custom field like "HTN" ("Harper Ticket Number") into the
+  # start of the task's title, wherever it's set — some spaces/clients name the
+  # field differently for the same concept. Leaves the title untouched if no
+  # matching field has a value. Distinct from the "Ticket" column, which shows
+  # ClickUp's own custom_id/id.
+  def titled_with_ticket_number(task)
+    field = (task["custom_fields"] || []).find do |f|
+      TICKET_NUMBER_FIELD_NAMES.include?(f["name"].to_s.downcase) && f["value"].to_s.present?
+    end
+
+    field ? "#{field['value']} - #{task['name']}" : task["name"]
   end
 
   def require_connections
@@ -202,11 +268,12 @@ class InvoicesController < ApplicationController
     end
   end
 
-  def build_line_item(task)
+  def build_line_item(task, subtasks = [])
     {
-      title: task["name"],
+      title: titled_with_ticket_number(task),
       ticket: task["custom_id"].presence || task["id"],
-      estimate_hours: task["time_estimate"] ? task["time_estimate"] / 3_600_000.0 : nil
+      estimate_hours: task["time_estimate"] ? task["time_estimate"] / 3_600_000.0 : nil,
+      notes: format_subtask_notes(subtasks)
     }
   end
 end

@@ -34,12 +34,15 @@ class ClickupClient
     get("/space/#{space_id}/list")["lists"]
   end
 
+  # Returns tasks and their subtasks as a single flat array — ClickUp distinguishes
+  # them via the "parent" field (nil for a top-level task, the parent's id otherwise)
+  # rather than nesting subtasks inside their parent.
   def tasks(list_id)
     tasks = []
     page = 0
 
     loop do
-      batch = get("/list/#{list_id}/task", "include_closed" => "true", "page" => page)["tasks"]
+      batch = get("/list/#{list_id}/task", "include_closed" => "true", "subtasks" => "true", "page" => page)["tasks"]
       tasks.concat(batch)
       break if batch.size < TASKS_PER_PAGE
 

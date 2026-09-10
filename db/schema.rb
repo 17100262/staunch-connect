@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_05_093156) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_07_194524) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -51,6 +51,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_093156) do
     t.decimal "estimate_hours", precision: 12, scale: 6
     t.decimal "hourly_rate", precision: 10, scale: 2
     t.bigint "invoice_id", null: false
+    t.text "notes"
     t.string "ticket"
     t.string "title"
     t.datetime "updated_at", null: false
@@ -68,6 +69,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_05_093156) do
   end
 
   create_table "project_mappings", force: :cascade do |t|
+    t.string "clickup_folder_id"
+    t.string "clickup_folder_name"
     t.string "clickup_space_id"
     t.string "clickup_space_name"
     t.datetime "created_at", null: false

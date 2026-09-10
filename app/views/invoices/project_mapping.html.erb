@@ -3,14 +3,18 @@
 
 <div class="h-full flex items-center justify-center p-8">
   <div class="w-full max-w-[480px] bg-white border border-slate-200 rounded-2xl shadow-sm p-7">
+    <% if alert = flash[:alert] %>
+      <p class="py-2 px-3 bg-red-50 text-red-500 font-medium rounded-lg mb-4"><%= alert %></p>
+    <% end %>
+
     <div class="flex items-start gap-3 mb-5">
       <span class="flex-none w-10 h-10 rounded-xl bg-brand-50 text-brand-400 flex items-center justify-center">
         <i class="ph ph-link text-xl"></i>
       </span>
       <div class="min-w-0">
-        <div class="font-bold text-base text-slate-900">Map "<%= @clickup_space_name || @clickup_space_id %>"</div>
+        <div class="font-bold text-base text-slate-900">Map "<%= @clickup_folder_name.presence || (@clickup_folder_id == InvoicesController::NO_FOLDER ? "No Folder" : @clickup_folder_id) %>"</div>
         <div class="mt-0.5 text-sm text-slate-600 leading-relaxed">
-          Which Hubstaff project should we total logged hours from for this ClickUp project? You only need to do this once.
+          Which Hubstaff project should we total logged hours from for this client? You only need to do this once.
         </div>
       </div>
     </div>
@@ -21,6 +25,8 @@
       <%= form_with url: project_mappings_path, method: :post, class: "flex flex-col gap-4" do |form| %>
         <%= form.hidden_field :clickup_space_id, value: @clickup_space_id %>
         <%= form.hidden_field :clickup_space_name, value: @clickup_space_name %>
+        <%= form.hidden_field :clickup_folder_id, value: @clickup_folder_id %>
+        <%= form.hidden_field :clickup_folder_name, value: @clickup_folder_name %>
 
         <div>
           <label class="block text-sm font-medium text-slate-900 mb-1.5" for="hubstaff_project_value">Hubstaff Project</label>
@@ -48,7 +54,7 @@
     <% end %>
 
     <div class="mt-4">
-      <%= link_to "Back to projects", invoicing_path, class: "text-sm text-slate-500 hover:text-slate-700" %>
+      <%= link_to "Back to projects", invoicing_path(clickup_space_id: @clickup_space_id, clickup_space_name: @clickup_space_name), class: "text-sm text-slate-500 hover:text-slate-700" %>
     </div>
   </div>
 </div>
