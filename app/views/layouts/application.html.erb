@@ -7,7 +7,7 @@
   <body>
     <%= render "shared/icons" %>
 
-    <div class="app" data-layout="panel" <%= "data-fixed" if content_for?(:full_bleed) %> data-controller="sidebar search" data-action="keydown@window->search#shortcut">
+    <div class="app" data-layout="panel" <%= "data-fixed" if content_for?(:full_bleed) %> data-controller="sidebar search dialogs" data-action="keydown@window->search#shortcut">
       <%= render "layouts/sidebar" %>
 
       <div class="app-main">
@@ -23,7 +23,8 @@
       </div>
 
       <%= render "layouts/search_dialog" %>
-      <turbo-frame id="modal"></turbo-frame>
+      <%= render "layouts/signout_dialog" %>
+      <turbo-frame id="modal"<%= %( src="#{ERB::Util.html_escape(@modal_src)}").html_safe if @modal_src %>></turbo-frame>
       <%= render "shared/toast" %>
     </div>
   </body>

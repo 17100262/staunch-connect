@@ -2,8 +2,11 @@ class ConnectionsController < ApplicationController
   AUTH_ERRORS = [ ClickupClient::AuthenticationError, HubstaffClient::AuthenticationError, FathomClient::AuthenticationError ].freeze
   REQUEST_ERRORS = [ ClickupClient::RequestError, HubstaffClient::RequestError, FathomClient::RequestError ].freeze
 
+  # Connectors live in the settings modal now; this keeps the old URL (and the
+  # redirects after connect, sync and disconnect) working.
   def index
-    @connections = Connection::SOURCES.index_with { |source| Connection.find_by(source: source) }
+    flash.keep
+    redirect_to settings_path(section: "connectors")
   end
 
   def create

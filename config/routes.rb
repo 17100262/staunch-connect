@@ -1,6 +1,9 @@
 Rails.application.routes.draw do
   resource :session
   resources :passwords, param: :token
+  get "settings", to: "settings#show", as: :settings
+  patch "settings/profile", to: "settings#update_profile", as: :settings_profile
+  patch "settings/password", to: "settings#update_password", as: :settings_password
   resources :connections, only: %i[index create destroy] do
     member { post :sync }
   end

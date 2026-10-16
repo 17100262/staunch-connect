@@ -73,8 +73,3 @@
     </div>
   </div>
 <% end %>
-
-<% if @modal_src %>
-  <%# Direct visit to /invoicing: open the setup modal over this page. %>
-  <turbo-frame id="modal" src="<%= @modal_src %>"></turbo-frame>
-<% end %>

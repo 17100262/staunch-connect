@@ -1,0 +1,59 @@
+<section aria-label="Profile">
+  <%
+    rows = [
+      [ :name, "Name", @user.name.presence || "Not set", :text ],
+      [ :email_address, "Email", @user.email_address, :email ],
+      [ :job_title, "Job title", @user.job_title.presence || "Not set", :text ],
+      [ :time_zone, "Time zone", @user.time_zone_label, :zone ]
+    ]
+  %>
+  <% rows.each do |field, label, value, kind| %>
+    <div data-controller="inline-edit">
+      <div class="sm-row" data-inline-edit-target="view">
+        <span class="sm-label"><%= label %></span>
+        <span class="sm-val"><%= value %></span>
+        <button type="button" class="btn btn-ghost" data-size="sm" data-action="inline-edit#start">Edit</button>
+      </div>
+      <%= form_with model: @user, url: settings_profile_path, method: :patch, html: { hidden: true, class: "sm-row sm-edit" }, data: { inline_edit_target: "form" } do |form| %>
+        <div class="field">
+          <label class="field-label" for="e-<%= field %>"><%= label %></label>
+          <% if kind == :zone %>
+            <div class="select">
+              <%= form.select field, User::TIME_ZONES.map { |zone, text| [ text, zone ] }, { selected: @user.time_zone || "Asia/Karachi" }, id: "e-#{field}", data: { inline_edit_target: "input" } %>
+              <%= icon "chevron-down" %>
+            </div>
+          <% else %>
+            <div class="input">
+              <%= form.send(kind == :email ? :email_field : :text_field, field, id: "e-#{field}", required: (kind == :email), data: { inline_edit_target: "input" }) %>
+            </div>
+          <% end %>
+        </div>
+        <div class="sm-edit-actions">
+          <button type="button" class="btn btn-secondary" data-size="sm" data-action="inline-edit#cancel">Cancel</button>
+          <button type="submit" class="btn btn-primary" data-size="sm">Save</button>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <div class="sm-row">
+    <div style="flex:1;min-width:0">
+      <h4 class="sm-label" style="margin:0">Delete account</h4>
+      <p class="card-desc" style="margin:var(--space-4) 0 0">Deleting your account removes your access to Staunch Connect. Invoices already saved stay with your workspace.</p>
+    </div>
+    <button type="button" class="btn btn-secondary" data-size="sm" data-action="dialogs#open" data-dialogs-name-param="delete-account">Delete account</button>
+  </div>
+
+  <div class="scrim" hidden data-dialogs-target="scrim" data-name="delete-account" data-action="click->dialogs#backdrop keydown.esc->dialogs#close">
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="da-t" aria-describedby="da-d" data-size="sm">
+      <div class="panel-header">
+        <span class="panel-icon" data-tone="warning" aria-hidden="true"><%= icon "triangle-alert" %></span>
+        <div class="panel-heading">
+          <h2 class="panel-title" id="da-t">Account deletion isn't available yet</h2>
+          <p class="panel-desc" id="da-d">Ask a workspace admin to remove your access. Your saved invoices and chats stay as they are until then.</p>
+        </div>
+      </div>
+      <div class="panel-footer"><button type="button" class="btn btn-secondary" data-action="dialogs#close">Close</button></div>
+    </div>
+  </div>
+</section>

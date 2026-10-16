@@ -9,7 +9,7 @@
     <div class="empty-icon"><%= icon "video" %></div>
     <h3 class="empty-title">No meetings yet</h3>
     <p class="empty-desc">Connect Fathom in Settings, then click Sync now to pull in your meetings. New ones sync automatically after that.</p>
-    <div class="empty-actions"><%= link_to "Connect Fathom", connections_path, class: "btn btn-primary" %></div>
+    <div class="empty-actions"><%= link_to "Connect Fathom", settings_path(section: "connectors"), class: "btn btn-primary", data: { turbo_frame: "modal" } %></div>
   </div>
 <% else %>
   <%= form_with url: meetings_path, method: :get, class: "filter-bar", role: "search" do |form| %>

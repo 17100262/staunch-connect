@@ -1,0 +1,41 @@
+<%
+  titles = { "profile" => "Profile", "password" => "Password", "notifications" => "Notifications", "connectors" => "Connectors" }
+  nav = [
+    [ "My account", [ [ "profile", "Profile", "user" ], [ "password", "Password", "eye" ], [ "notifications", "Notifications", "bell" ] ] ],
+    [ "Workspace", [ [ "connectors", "Connectors", "share" ] ] ]
+  ]
+%>
+<turbo-frame id="modal">
+  <div class="scrim" data-controller="modal dialogs" data-action="click->modal#backdrop">
+    <div class="dialog sm2" role="dialog" aria-modal="true" aria-labelledby="sm2-t" style="--_w:960px">
+      <nav class="sm2-nav" aria-label="Settings sections">
+        <h2 class="sr-only">Settings</h2>
+        <% nav.each do |group, items| %>
+          <div class="sidebar-label"><%= group %></div>
+          <% items.each do |key, label, icon_name| %>
+            <%= link_to settings_path(section: key), class: "nav-item", aria: { current: (@section == key ? "page" : nil) } do %>
+              <%= icon icon_name %><span class="nav-label"><%= label %></span>
+            <% end %>
+          <% end %>
+        <% end %>
+      </nav>
+
+      <div class="sm2-main">
+        <header class="sm2-head no-tabs">
+          <div class="sm2-title">
+            <h2 class="t-heading-md" id="sm2-t" style="margin:0"><%= titles[@section] %></h2>
+            <button type="button" class="icon-btn btn-ghost" data-size="sm" aria-label="Close settings" data-action="modal#close"><%= icon "x" %></button>
+          </div>
+        </header>
+
+        <div class="sm2-body" data-controller="poll">
+          <% if flash[:alert].present? %>
+            <div class="alert" role="alert" data-tone="danger" style="margin-bottom:var(--space-16)"><%= icon "circle-alert" %><div class="alert-content"><%= flash[:alert] %></div></div>
+          <% end %>
+          <%= render "settings/#{@section}" %>
+        </div>
+      </div>
+    </div>
+    <%= render "shared/toast" %>
+  </div>
+</turbo-frame>

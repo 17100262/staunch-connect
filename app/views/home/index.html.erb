@@ -11,7 +11,7 @@
     <h2 class="banner-title" id="home-banner">Connect your first data source</h2>
     <p class="banner-desc">Link Hubstaff and ClickUp to start building your consolidated task view. Other sources unlock as they come online.</p>
     <div class="banner-actions">
-      <%= link_to connections_path, class: "btn btn-primary" do %><%= icon "plus" %>Connect sources<% end %>
+      <%= link_to settings_path(section: "connectors"), class: "btn btn-primary", data: { turbo_frame: "modal" } do %><%= icon "plus" %>Connect sources<% end %>
     </div>
   </div>
   <div class="banner-aside">

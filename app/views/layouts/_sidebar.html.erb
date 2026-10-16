@@ -58,19 +58,34 @@
     </span>
   </nav>
 
-  <div class="rail-bottom">
+  <div class="rail-bottom" data-controller="toggle theme" data-action="click@window->toggle#outside keydown.esc->toggle#hide">
     <span class="tooltip-wrap" data-placement="right">
-      <%= link_to connections_path, class: "nav-item", aria: { label: "Settings", current: (controller_name == "connections" ? "page" : nil) } do %>
-        <svg class="icon rail-ic ic-settings" viewBox="0 0 24 24" aria-hidden="true"><g class="gear"><path class="duo" d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></g></svg><span class="nav-label">Settings</span>
-      <% end %>
-      <span class="tooltip" role="tooltip">Settings</span>
+      <button type="button" class="nav-item" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu" data-toggle-target="trigger" data-action="toggle#toggle">
+        <span class="avatar" data-size="sm"><%= Current.user.initials %></span><span class="nav-label"><%= Current.user.first_name %></span>
+      </button>
+      <span class="tooltip" role="tooltip">Profile</span>
     </span>
 
-    <span class="tooltip-wrap" data-placement="right">
-      <%= button_to session_path, method: :delete, class: "nav-item", form_class: "rail-signout", aria: { label: "Sign out #{Current.user.email_address}" } do %>
-        <span class="avatar" data-size="sm"><%= Current.user.email_address.first(2).upcase %></span><span class="nav-label">Sign out</span>
-      <% end %>
-      <span class="tooltip" role="tooltip">Sign out</span>
-    </span>
+    <div class="menu account-menu" role="menu" aria-label="Account" data-floating hidden data-toggle-target="panel">
+      <div class="account-head">
+        <span class="avatar" data-size="md"><%= Current.user.initials %></span>
+        <div class="account-who">
+          <p class="label-base"><%= Current.user.display_name %></p>
+          <p class="caption"><%= Current.user.email_address %></p>
+        </div>
+      </div>
+      <div class="menu-sep" role="separator"></div>
+      <div class="account-row">
+        <span class="label-base" id="pm-theme">Theme</span>
+        <div class="segmented" data-size="sm" role="radiogroup" aria-labelledby="pm-theme">
+          <button type="button" role="radio" class="segment" aria-checked="true" data-theme-target="light" data-action="theme#light"><%= icon "sun" %>Light</button>
+          <button type="button" role="radio" class="segment" aria-checked="false" data-theme-target="dark" data-action="theme#dark"><%= icon "moon" %>Dark</button>
+        </div>
+      </div>
+      <div class="menu-sep" role="separator"></div>
+      <%= link_to settings_path, role: "menuitem", class: "menu-item", data: { turbo_frame: "modal", action: "toggle#hide" } do %><%= icon "settings" %>Settings<% end %>
+      <div class="menu-sep" role="separator"></div>
+      <button type="button" role="menuitem" class="menu-item" data-action="dialogs#open toggle#hide" data-dialogs-name-param="signout"><%= icon "log-out" %>Sign out</button>
+    </div>
   </div>
 </aside>

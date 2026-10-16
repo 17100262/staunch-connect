@@ -10,7 +10,7 @@
       </div>
       <div class="panel-footer">
         <button type="button" class="btn btn-secondary" data-action="modal#close">Close</button>
-        <%= link_to "Open settings", connections_path, class: "btn btn-primary", data: { turbo_frame: "_top" } %>
+        <%= link_to "Open settings", settings_path(section: "connectors"), class: "btn btn-primary" %>
       </div>
     </div>
   </div>

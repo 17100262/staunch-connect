@@ -1,0 +1,35 @@
+<%# UI preview: notification preferences are not stored anywhere yet. %>
+<%
+  groups = [
+    [ "Meetings", [ [ "New meeting available", "A Fathom recording has been processed." ] ] ],
+    [ "Invoicing", [ [ "Reconciliation ready", "Your hours and estimates have been matched up and are ready to check." ], [ "Invoice generated", "An invoice has been generated and is ready to review." ] ] ]
+  ]
+%>
+<section aria-label="Notifications" data-controller="tabs">
+  <div class="alert" role="status" data-tone="info"><%= icon "info" %><div class="alert-content">Preview: notification preferences aren't saved yet, so these switches won't change what you receive.</div></div>
+
+  <div class="tabs" role="tablist" aria-label="Notification channel">
+    <button type="button" role="tab" class="tab" id="tab-in" aria-selected="true" data-tabs-target="tab" data-action="tabs#select" data-panel="in">In app</button>
+    <button type="button" role="tab" class="tab" id="tab-em" aria-selected="false" data-tabs-target="tab" data-action="tabs#select" data-panel="em">Email</button>
+  </div>
+
+  <% { "in" => "In-app events", "em" => "Email events" }.each do |key, heading| %>
+    <section role="tabpanel" aria-labelledby="tab-<%= key %>" data-tabs-target="panel" data-panel="<%= key %>" <%= "hidden" unless key == "in" %>>
+      <div class="sec-head">
+        <h3 class="t-heading-sm" style="margin:0"><%= heading %></h3>
+        <p class="card-desc"><%= key == "in" ? "Choose which events show up on your Notifications screen and the rail count." : "Staunch Connect sends these to #{@user.email_address}." %></p>
+      </div>
+      <% groups.each do |group, events| %>
+        <h3 class="caption"><%= group %></h3>
+        <ul class="slist">
+          <% events.each do |title, desc| %>
+            <li class="srow">
+              <div class="srow-text"><span class="srow-t"><%= title %></span><span class="card-desc"><%= desc %></span></div>
+              <label class="switch"><input type="checkbox" role="switch" checked><span class="switch-track"><span class="switch-thumb"></span></span><span class="sr-only"><%= key == "in" ? "In app" : "Email" %>: <%= title %></span></label>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+    </section>
+  <% end %>
+</section>

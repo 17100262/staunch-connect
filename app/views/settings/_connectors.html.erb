@@ -1,0 +1,88 @@
+<%
+  meta = {
+    "hubstaff" => { initials: "HS", name: "Hubstaff", desc: "Time tracking", field: "Personal token", hint: "Find it in Hubstaff under your profile settings. We only read data." },
+    "clickup" => { initials: "CU", name: "ClickUp", desc: "Tasks and estimates", field: "Personal token", hint: "Find it in ClickUp under your profile settings. We only read data." },
+    "fathom" => { initials: "FA", name: "Fathom", desc: "Meeting recordings and transcripts", field: "API key", hint: "Find it in Fathom under your profile settings. We only read data." }
+  }
+  syncing = @connections.values.compact.any?(&:syncing?)
+%>
+<section aria-label="Connectors">
+  <div class="sm-stack">
+    <p class="card-desc" style="margin:0">Start with Hubstaff and ClickUp, they unlock invoicing. Fathom is optional.</p>
+    <% if syncing %><span data-poll-target="active" hidden></span><% end %>
+
+    <% meta.each do |source, info| %>
+      <% connection = @connections[source] %>
+      <% status = connection&.status || "disconnected" %>
+      <% connected = connection&.connected? || connection&.syncing? %>
+      <article class="sm-conn" aria-label="<%= info[:name] %>" data-controller="toggle">
+        <div class="sm-conn-top">
+          <span class="avatar" data-size="md"><%= info[:initials] %></span>
+          <div class="sm-grow">
+            <h4 class="card-title"><%= info[:name] %></h4>
+            <p class="card-desc">
+              <% if status == "syncing" %>Syncing in the background…
+              <% elsif connected %><%= info[:desc] %> · last synced <%= connection.last_used_at ? "#{time_ago_in_words(connection.last_used_at)} ago" : "never" %>
+              <% elsif status == "error" %><%= connection.last_error %>
+              <% else %><%= info[:desc] %>
+              <% end %>
+            </p>
+          </div>
+
+          <% if status == "syncing" %>
+            <span class="badge" data-tone="info"><svg class="spinner" data-size="sm" aria-hidden="true"><use href="#i-loader"/></svg>Syncing</span>
+          <% elsif connected %>
+            <span class="badge" data-tone="success"><span class="badge-dot"></span>Connected</span>
+            <span class="tooltip-wrap" data-placement="bottom">
+              <%= button_to sync_connection_path(connection), method: :post, class: "icon-btn btn-secondary", data: { size: "sm" }, aria: { label: "Sync #{info[:name]} now" }, form: { class: "inline-form" } do %><%= icon "rotate-cw" %><% end %>
+              <span class="tooltip" role="tooltip">Sync now</span>
+            </span>
+            <span class="menu-anchor" data-controller="toggle" data-action="click@window->toggle#outside keydown.esc->toggle#hide">
+              <button type="button" class="icon-btn btn-ghost" data-size="sm" aria-haspopup="menu" aria-expanded="false" aria-label="More actions for <%= info[:name] %>" data-toggle-target="trigger" data-action="toggle#toggle"><%= icon "ellipsis" %></button>
+              <div class="menu" role="menu" data-floating style="inset-block-start:calc(100% + var(--space-4));inset-inline-end:0" hidden data-toggle-target="panel">
+                <%= button_to connection_path(connection), method: :delete, class: "menu-item", data: { tone: "danger" }, form: { class: "inline-form", data: { turbo_confirm: "Disconnect #{info[:name]}? Synced data stays." } } do %><%= icon "x" %>Disconnect<% end %>
+              </div>
+            </span>
+          <% else %>
+            <% if status == "error" %><span class="badge" data-tone="danger"><%= icon "circle-alert" %>Needs attention</span><% end %>
+            <button type="button" class="btn btn-primary" data-size="sm" aria-expanded="false" data-toggle-target="trigger" data-action="toggle#toggle"><%= icon "plus" %><%= status == "error" ? "Reconnect" : "Connect" %></button>
+          <% end %>
+        </div>
+
+        <% if source == "fathom" && connected %>
+          <% if connection.webhook_id.present? %>
+            <div class="alert" data-tone="success"><%= icon "circle-check" %><div class="alert-content">Webhook registered. New meetings sync automatically.</div></div>
+          <% else %>
+            <div class="alert" data-tone="warning"><%= icon "triangle-alert" %><div class="alert-content">No webhook registered. New meetings only appear after you use Sync now.</div></div>
+          <% end %>
+        <% end %>
+
+        <% unless connected && status != "error" %>
+          <%= form_with url: connections_path, method: :post, class: "sm-tok", html: { hidden: true }, data: { toggle_target: "panel" } do |form| %>
+            <%= form.hidden_field :source, value: source %>
+            <div class="field">
+              <label class="field-label" for="tok-<%= source %>"><%= info[:field] %></label>
+              <div class="input"><%= form.password_field :credential, id: "tok-#{source}", autocomplete: "off", placeholder: "Paste your #{info[:field].downcase}", required: true %></div>
+              <div class="field-hint"><%= info[:hint] %></div>
+            </div>
+            <div class="sm-edit-actions">
+              <button type="button" class="btn btn-secondary" data-size="sm" data-action="toggle#toggle">Cancel</button>
+              <button type="submit" class="btn btn-primary" data-size="sm">Connect <%= info[:name] %></button>
+            </div>
+          <% end %>
+        <% end %>
+      </article>
+    <% end %>
+
+    <h4 class="caption">Coming soon</h4>
+    <% [ [ "SL", "Slack", "Messages and threads" ], [ "GH", "GitHub", "Branches, commits and pull requests" ], [ "GM", "Gmail", "Email threads" ] ].each do |initials, name, desc| %>
+      <article class="sm-conn" aria-label="<%= name %>">
+        <div class="sm-conn-top">
+          <span class="avatar" data-size="md"><%= initials %></span>
+          <div class="sm-grow"><h4 class="card-title"><%= name %></h4><p class="card-desc"><%= desc %></p></div>
+          <span class="badge">Coming soon</span>
+        </div>
+      </article>
+    <% end %>
+  </div>
+</section>
