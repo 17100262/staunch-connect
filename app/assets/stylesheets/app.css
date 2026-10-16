@@ -285,3 +285,23 @@ turbo-frame#modal[aria-busy="true"]::after { content: ""; width: 32px; height: 3
 .take { margin: 0; color: var(--fg-secondary); font: var(--text-body-sm); text-align: center; }
 .dash .empty { padding: var(--space-24) 0; }
 @media (max-width: 1023px) { .dcols { grid-template-columns: minmax(0, 1fr) !important; } .stats-3 { grid-template-columns: minmax(0, 1fr); } }
+
+/* Meetings (from the Staunch Connect Redesign canvas) */
+.page.page-narrow { width: min(100%, 860px); }
+.attendee-cell { display: flex; align-items: center; gap: var(--space-8); }
+.attendee-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); margin: var(--space-16) 0; }
+.meeting-panels { padding-top: var(--space-24); }
+.meeting-panels > [role="tabpanel"] { max-width: 760px; }
+.meeting-prose > * + * { margin-top: var(--space-12); }
+.meeting-prose h1, .meeting-prose h2 { font: var(--label-lg-weight) var(--label-lg-size)/var(--label-lg-line) var(--label-lg-family); margin-top: var(--space-32); }
+.meeting-prose > :first-child { margin-top: 0; }
+.meeting-prose li { line-height: 1.6; }
+.meeting-prose ul, .meeting-prose ol { display: flex; flex-direction: column; gap: var(--space-12); }
+.transcript-lines { display: flex; flex-direction: column; gap: var(--space-12); }
+.transcript-lines p { margin: 0; }
+.item-done { text-decoration: line-through; color: var(--fg-secondary); }
+.nv-gate { width: min(100%, 880px); margin-inline: auto; }
+.ghost-table { width: min(100%, 880px); margin: var(--space-24) auto 0; opacity: .75; }
+.ghost-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: var(--space-24); align-items: center; padding: var(--space-16) 0; border-bottom: var(--border-width) solid var(--border-subtle); }
+.ghost-note { width: min(100%, 880px); margin: var(--space-16) auto 0; display: flex; align-items: center; gap: var(--space-8); }
+.table-footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-16); padding-top: var(--space-16); color: var(--fg-secondary); }

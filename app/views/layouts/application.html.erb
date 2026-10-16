@@ -12,10 +12,11 @@
 
       <div class="app-main">
         <div class="app-body">
+          <%= yield :topbar %>
           <% if content_for?(:full_bleed) %>
             <%= yield %>
           <% else %>
-            <main class="page">
+            <main class="page <%= yield :page_class %>">
               <%= yield %>
             </main>
           <% end %>

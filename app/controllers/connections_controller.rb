@@ -47,11 +47,12 @@ class ConnectionsController < ApplicationController
 
   def sync
     connection = Connection.find(params[:id])
+    @return_to = local_path(params[:return_to])
 
     if connection.source == "fathom"
       connection.update!(status: :syncing)
       FathomSyncJob.perform_later(connection.id)
-      return redirect_to connections_path, notice: "Fathom sync started in the background — meetings will appear as they're pulled in."
+      return redirect_to after_sync_path, notice: "Fathom sync started in the background — meetings will appear as they're pulled in."
     end
 
     begin
@@ -59,7 +60,7 @@ class ConnectionsController < ApplicationController
       client.verify!
       persist_client_tokens(connection, client)
       connection.update!(status: :connected, last_error: nil, last_used_at: Time.current)
-      redirect_to connections_path, notice: "#{connection.source.capitalize} synced."
+      redirect_to after_sync_path, notice: "#{connection.source.capitalize} synced."
     rescue *AUTH_ERRORS => e
       mark_error(connection, e.message)
     rescue *REQUEST_ERRORS => e
@@ -76,6 +77,16 @@ class ConnectionsController < ApplicationController
   end
 
   private
+
+  # Sync can be started from the settings modal or from a page like Meetings;
+  # go back to wherever it was started.
+  def after_sync_path
+    @return_to || connections_path
+  end
+
+  def local_path(path)
+    path.to_s.start_with?("/") && !path.to_s.start_with?("//") ? path.to_s : nil
+  end
 
   def client_for(connection, use_cached_access_token: true)
     case connection.source
@@ -136,6 +147,6 @@ class ConnectionsController < ApplicationController
     connection.status = :error
     connection.last_error = message
     connection.save!
-    redirect_to connections_path, alert: message
+    redirect_to (@return_to || connections_path), alert: message
   end
 end

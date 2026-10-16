@@ -92,4 +92,35 @@ module ApplicationHelper
   def source_summary(names)
     names.size > 1 ? "#{names[0..-2].join(', ')} and #{names.last}" : names.first.to_s
   end
+
+  AVATAR_TONES = %w[brand info success warning].freeze
+
+  def person_initials(name)
+    name.to_s.split(/[\s@.]+/).reject(&:blank?).first(2).map { |part| part[0] }.join.upcase.presence || "?"
+  end
+
+  # A person keeps one tone, picked from their name; inside one group no two avatars share a tone.
+  def person_tone(name, taken = [])
+    index = Zlib.crc32(name.to_s) % AVATAR_TONES.size
+    AVATAR_TONES.size.times do
+      tone = AVATAR_TONES[index]
+      return tone unless taken.include?(tone)
+
+      index = (index + 1) % AVATAR_TONES.size
+    end
+    AVATAR_TONES[index]
+  end
+
+  # Up to three avatars: every person when there are three or fewer, otherwise two people and "+N".
+  def attendee_stack(names)
+    shown = names.size <= 3 ? names : names.first(2)
+    taken = []
+    stack = shown.map do |name|
+      tone = person_tone(name, taken)
+      taken << tone
+      { text: person_initials(name), tone: tone }
+    end
+    stack << { text: "+#{names.size - 2}", tone: nil } if names.size > 3
+    stack
+  end
 end

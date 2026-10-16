@@ -1,55 +1,123 @@
 <% content_for :title, @meeting.title.presence || "Untitled meeting" %>
-
-<nav class="breadcrumb" aria-label="Breadcrumb"><ol>
-  <li><%= link_to "Meetings", meetings_path %><span class="breadcrumb-sep" aria-hidden="true"><%= icon "chevron-right" %></span></li>
-  <li><span aria-current="page"><%= @meeting.title.presence || "Untitled meeting" %></span></li>
-</ol></nav>
+<% content_for :page_class, "page-narrow" %>
+<%
+  names = @meeting.attendee_names
+  people = Array(@meeting.attendees).select { |a| a.is_a?(Hash) }
+  items = Array(@meeting.action_items).select { |i| i.is_a?(Hash) }
+  open_items = @meeting.open_action_items.size
+  title = @meeting.title.presence || "Untitled meeting"
+%>
+<% content_for :topbar do %>
+  <header class="topbar">
+    <div class="topbar-start">
+      <%= link_to meetings_path, class: "icon-btn btn-ghost", data: { size: "sm" }, aria: { label: "Back to all meetings" } do %><%= icon "chevron-left" %><% end %>
+      <nav class="breadcrumb" aria-label="Breadcrumb"><ol>
+        <li><%= link_to "Meetings", meetings_path %><span class="breadcrumb-sep" aria-hidden="true"><%= icon "chevron-right" %></span></li>
+        <li><span aria-current="page"><%= title %></span></li>
+      </ol></nav>
+    </div>
+    <div class="topbar-end">
+      <% if @meeting.fathom_url.present? %>
+        <%= link_to @meeting.fathom_url, target: "_blank", rel: "noopener", class: "btn btn-ghost" do %><%= icon "external" %>View in Fathom<% end %>
+      <% end %>
+      <%= link_to ai_conversations_path, class: "btn btn-primary" do %><%= icon "message-circle" %>Start a chat<% end %>
+    </div>
+  </header>
+<% end %>
 
 <header class="page-header">
   <div>
-    <h1 class="page-title"><%= @meeting.title.presence || "Untitled meeting" %></h1>
+    <h1 class="page-title"><%= title %></h1>
     <p class="page-desc">
       <%= @meeting.recorded_at ? @meeting.recorded_at.strftime("%B %-d, %Y") : "Date unknown" %>
       <% if @meeting.duration_minutes.present? %> · <%= @meeting.duration_minutes %> min<% end %>
     </p>
   </div>
-  <div class="page-actions">
-    <% if @meeting.fathom_url.present? %>
-      <%= link_to @meeting.fathom_url, target: "_blank", rel: "noopener", class: "btn btn-secondary" do %><%= icon "video" %>View in Fathom<% end %>
-    <% else %>
-      <span class="caption">Fathom link unavailable</span>
-    <% end %>
-  </div>
 </header>
 
-<% if attendee_names(@meeting).any? %>
-  <div class="card">
-    <div class="card-body">
-      <dl class="kv">
-        <dt>Attendees</dt><dd><%= attendee_names(@meeting).join(", ") %></dd>
-      </dl>
-    </div>
+<% if people.any? %>
+  <div class="attendee-row" role="group" aria-label="Attendees">
+    <% taken = [] %>
+    <% people.first(8).each do |a| %>
+      <% label = a["name"].presence || a["email"].presence || "Guest" %>
+      <% tone = person_tone(label, taken) %><% taken << tone %>
+      <span class="tooltip-wrap" data-placement="bottom">
+        <span class="avatar" data-size="sm" data-tone="<%= tone %>" tabindex="0" role="img" aria-label="<%= [ a["name"], a["email"] ].compact_blank.join(", ") %>"><%= person_initials(label) %></span>
+        <span class="tooltip" role="tooltip"><span style="display:block;font-weight:600"><%= label %></span><% if a["email"].present? && a["email"] != label %><span style="display:block"><%= a["email"] %></span><% end %></span>
+      </span>
+    <% end %>
+    <% if people.size > 8 %><span class="avatar" data-size="sm">+<%= people.size - 8 %></span><% end %>
+    <span class="body-sm" style="color:var(--fg-secondary);margin-inline-start:var(--space-4)"><%= pluralize(people.size, "attendee") %></span>
   </div>
 <% end %>
 
-<div class="card">
-  <div class="card-header"><h2 class="card-title">Summary</h2></div>
-  <div class="card-body">
-    <% if @meeting.summary.present? %>
-      <div class="prose"><%= markdown_to_html(@meeting.summary) %></div>
-    <% else %>
-      <p class="caption"><%= @meeting.processing? ? "Still processing in Fathom. Check back soon." : "No summary generated." %></p>
-    <% end %>
+<div data-controller="tabs">
+  <div class="tabs" role="tablist" aria-label="Meeting sections">
+    <button type="button" class="tab" role="tab" aria-selected="true" data-tabs-target="tab" data-action="tabs#select" data-panel="summary">Summary</button>
+    <button type="button" class="tab" role="tab" aria-selected="false" data-tabs-target="tab" data-action="tabs#select" data-panel="actions">Action items<% if items.any? %><span class="badge" style="margin-inline-start:var(--space-8)"><%= items.size %></span><% end %></button>
+    <button type="button" class="tab" role="tab" aria-selected="false" data-tabs-target="tab" data-action="tabs#select" data-panel="transcript">Transcript</button>
   </div>
-</div>
 
-<div class="card">
-  <div class="card-header"><h2 class="card-title">Transcript</h2></div>
-  <div class="card-body">
-    <% if @meeting.transcript.present? %>
-      <div class="transcript body-base"><%= @meeting.transcript %></div>
-    <% else %>
-      <p class="caption"><%= @meeting.processing? ? "Still processing in Fathom. Check back soon." : "No transcript available." %></p>
-    <% end %>
+  <div class="meeting-panels">
+    <div role="tabpanel" data-tabs-target="panel" data-panel="summary">
+      <% if @meeting.summary.present? %>
+        <div class="prose meeting-prose"><%= markdown_to_html(@meeting.summary) %></div>
+      <% else %>
+        <div class="empty" data-size="sm">
+          <div class="empty-icon"><%= icon(@meeting.processing? ? "clock" : "file") %></div>
+          <h3 class="empty-title"><%= @meeting.processing? ? "Still processing in Fathom" : "No summary generated" %></h3>
+          <p class="empty-desc"><%= @meeting.processing? ? "Check back soon. The summary and transcript appear once Fathom finishes." : "Fathom didn't produce a summary for this meeting." %></p>
+        </div>
+      <% end %>
+    </div>
+
+    <div role="tabpanel" data-tabs-target="panel" data-panel="actions" hidden>
+      <% if items.empty? %>
+        <div class="empty" data-size="sm">
+          <div class="empty-icon"><%= icon "list-checks" %></div>
+          <h3 class="empty-title">No action items</h3>
+          <p class="empty-desc">Fathom didn't find any action items in this meeting.</p>
+        </div>
+      <% else %>
+        <ul class="file-list">
+          <% items.each do |item| %>
+            <% assignee = item["assignee"].is_a?(Hash) ? (item["assignee"]["name"].presence || item["assignee"]["email"]) : item["assignee"] %>
+            <li class="file" style="align-items:center">
+              <span class="tile"><%= icon(item["completed"] ? "circle-check" : "square-check") %></span>
+              <div class="file-main">
+                <span class="file-name <%= "item-done" if item["completed"] %>"><%= item["description"] %></span>
+                <span class="file-meta"><%= [ (assignee.presence || "Unassigned"), item["recording_timestamp"].presence ].compact.join(" · ") %></span>
+              </div>
+              <span class="badge" <%= 'data-tone="success"'.html_safe if item["completed"] %>><%= item["completed"] ? "Done" : "Open" %></span>
+              <% if item["recording_playback_url"].present? %>
+                <%= link_to item["recording_playback_url"], target: "_blank", rel: "noopener", class: "icon-btn btn-ghost", data: { size: "sm" }, aria: { label: "Open this moment in the recording" } do %><%= icon "external" %><% end %>
+              <% end %>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+    </div>
+
+    <div role="tabpanel" data-tabs-target="panel" data-panel="transcript" hidden>
+      <% if @meeting.transcript.present? %>
+        <div class="transcript-lines">
+          <% @meeting.transcript.each_line do |line| %>
+            <% speaker, text = line.strip.split(": ", 2) %>
+            <% next if line.strip.empty? %>
+            <% if text.nil? %>
+              <p><%= line.strip %></p>
+            <% else %>
+              <p><span class="label-base"><%= speaker %>:</span> <span dir="auto"><%= text %></span></p>
+            <% end %>
+          <% end %>
+        </div>
+      <% else %>
+        <div class="empty" data-size="sm">
+          <div class="empty-icon"><%= icon(@meeting.processing? ? "clock" : "file") %></div>
+          <h3 class="empty-title"><%= @meeting.processing? ? "Still processing in Fathom" : "No transcript available" %></h3>
+          <p class="empty-desc"><%= @meeting.processing? ? "Check back soon." : "Fathom didn't produce a transcript for this meeting." %></p>
+        </div>
+      <% end %>
+    </div>
   </div>
 </div>
