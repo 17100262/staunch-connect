@@ -153,3 +153,8 @@ turbo-frame#modal[aria-busy="true"] { position: fixed; inset: 0; z-index: var(--
 turbo-frame#modal[aria-busy="true"]::after { content: ""; width: 32px; height: 32px; border-radius: var(--radius-full); border: 3px solid rgba(255, 255, 255, .35); border-top-color: var(--bg-surface); animation: modal-spin 700ms linear infinite; }
 @keyframes modal-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { turbo-frame#modal[aria-busy="true"]::after { animation: none; } }
+
+/* Long unbroken names (invoice names, file names) must wrap inside dialogs, not run past the edge. */
+.dialog .panel-title, .dialog .panel-desc, .sheet .panel-title, .sheet .panel-desc { overflow-wrap: anywhere; word-break: break-word; }
+/* Dialogs rendered inside table cells would otherwise inherit the cell's no-wrap and alignment. */
+.scrim { white-space: normal; text-align: start; }
