@@ -1,4 +1,4 @@
-<% content_for :title, "Invoicing" %>
+<% content_for :title, "New invoice" %>
 
 <nav class="breadcrumb" aria-label="Breadcrumb"><ol>
   <li><%= link_to "Invoicing", invoices_path %><span class="breadcrumb-sep" aria-hidden="true"><%= icon "chevron-right" %></span></li>
@@ -8,24 +8,36 @@
 <header class="page-header">
   <div>
     <h1 class="page-title">New invoice</h1>
-    <p class="page-desc">Pick the ClickUp project to build a reconciliation for.</p>
+    <p class="page-desc">Build a reconciliation from ClickUp estimates and Hubstaff hours.</p>
   </div>
 </header>
 
+<%= render "invoices/flow_steps", current: 1 %>
 <%= tag.div flash_alerts, class: "flash-stack" if flash.any? %>
 
-<% if @spaces.empty? %>
-  <div class="empty" data-size="sm">
-    <div class="empty-icon"><%= icon "folder" %></div>
-    <h3 class="empty-title">No ClickUp projects found</h3>
-    <p class="empty-desc">No projects were found for this workspace.</p>
+<div class="card flow-card">
+  <div class="card-header">
+    <div><h2 class="card-title">Choose a ClickUp project</h2><p class="card-desc">Pick the workspace to bill from.</p></div>
   </div>
-<% else %>
-  <div class="pick-list narrow">
-    <% @spaces.each do |space| %>
-      <%= link_to invoicing_path(clickup_space_id: space["id"], clickup_space_name: space["name"]), class: "card", data: { padding: "sm" } do %>
-        <span class="pick-row"><span class="label-base"><%= space["name"] %></span><%= icon "arrow-right" %></span>
-      <% end %>
+  <div class="card-body">
+    <% if @spaces.empty? %>
+      <div class="empty" data-size="sm">
+        <div class="empty-icon"><%= icon "folder" %></div>
+        <h3 class="empty-title">No ClickUp projects found</h3>
+        <p class="empty-desc">No projects were found for this workspace. Check the ClickUp connection in Settings.</p>
+        <div class="empty-actions"><%= link_to "Open settings", connections_path, class: "btn btn-secondary" %></div>
+      </div>
+    <% else %>
+      <div class="pick-list">
+        <% @spaces.each do |space| %>
+          <%= link_to invoicing_path(clickup_space_id: space["id"], clickup_space_name: space["name"]), class: "card", data: { padding: "sm", interactive: true } do %>
+            <span class="pick-row">
+              <span class="pick-lead"><span class="tile"><%= space["name"].to_s.first(2).upcase %></span><span class="label-base"><%= space["name"] %></span></span>
+              <%= icon "chevron-right" %>
+            </span>
+          <% end %>
+        <% end %>
+      </div>
     <% end %>
   </div>
-<% end %>
+</div>

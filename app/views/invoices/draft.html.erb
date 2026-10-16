@@ -8,8 +8,8 @@
 
 <header class="page-header">
   <div>
-    <h1 class="page-title"><%= project_name %> reconciliation</h1>
-    <p class="page-desc">Mapped to Hubstaff project "<%= @mapping.hubstaff_project_name %>"</p>
+    <h1 class="page-title">New invoice</h1>
+    <p class="page-desc"><%= project_name %> · Hubstaff project "<%= @mapping.hubstaff_project_name %>"</p>
   </div>
   <%= form_with url: invoicing_draft_path, method: :get, class: "page-actions" do |form| %>
     <%= form.hidden_field :clickup_space_id, value: @clickup_space_id %>
@@ -31,6 +31,7 @@
   <% end %>
 </header>
 
+<%= render "invoices/flow_steps", current: 4 %>
 <%= tag.div flash_alerts, class: "flash-stack" if flash.any? %>
 
 <div class="stats">
