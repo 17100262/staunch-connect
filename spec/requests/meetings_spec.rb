@@ -57,6 +57,13 @@ RSpec.describe "Meetings" do
       expect(response.body).not_to include("<script>alert(1)")
     end
 
+    it "never renders a non-http Fathom URL as a link" do
+      get meeting_path(create(:meeting, fathom_url: "javascript:alert(1)"))
+
+      expect(response.body).not_to include("javascript:alert(1)")
+      expect(response.body).not_to include("View in Fathom")
+    end
+
     it "renders a meeting still processing" do
       get meeting_path(create(:meeting, :processing))
 

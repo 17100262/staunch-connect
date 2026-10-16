@@ -62,6 +62,12 @@ RSpec.describe Meeting do
     expect(meeting.attendee_names).to eq([ "Ada", "x@y.z" ])
   end
 
+  it "#fathom_link only returns http(s) URLs" do
+    expect(build(:meeting, fathom_url: "https://fathom.video/share/x").fathom_link).to eq("https://fathom.video/share/x")
+    expect(build(:meeting, fathom_url: "javascript:alert(1)").fathom_link).to be_nil
+    expect(build(:meeting, fathom_url: nil).fathom_link).to be_nil
+  end
+
   it "#processing? is true until Fathom delivers a summary or transcript" do
     expect(build(:meeting, :processing)).to be_processing
     expect(build(:meeting, summary: nil)).not_to be_processing
