@@ -26,12 +26,17 @@ class HubstaffClient
     true
   end
 
+  # Organizations and projects are cached briefly (the project list feeds the
+  # invoice setup modal). The key ignores the refresh token, which rotates on
+  # every exchange.
+  STRUCTURE_CACHE = ActiveSupport::Cache::MemoryStore.new(expires_in: 5.minutes)
+
   def organizations
-    get("/organizations")["organizations"]
+    STRUCTURE_CACHE.fetch("organizations") { get("/organizations")["organizations"] }
   end
 
   def projects(organization_id)
-    get("/organizations/#{organization_id}/projects")["projects"]
+    STRUCTURE_CACHE.fetch([ "projects", organization_id ]) { get("/organizations/#{organization_id}/projects")["projects"] }
   end
 
   def daily_activities(organization_id:, project_id:, date_from:, date_to:)

@@ -1,33 +1,91 @@
-<aside class="hidden md:flex md:flex-col w-62 shrink-0 h-full bg-white border-r border-slate-200 p-3 box-border">
-  <div class="flex items-center gap-2.5 px-2 pt-2 pb-4">
-    <span class="w-[30px] h-[30px] rounded-lg bg-brand-400 text-white flex items-center justify-center font-display font-extrabold text-base">S</span>
-    <span class="font-display font-extrabold text-lg text-slate-900">Staunch Connect</span>
+<%# SC design system: rail sidebar (Sidebar → Rail variant). Labels collapse via data-collapsed; every item keeps an aria-label for that state. %>
+<aside class="sidebar" data-variant="rail" aria-label="Sidebar" data-sidebar-target="rail">
+  <div class="rail-top">
+    <%= link_to root_path, class: "rail-logo", aria: { label: "Staunch Connect home" } do %>
+      <span class="avatar" data-size="sm">SC</span><span class="rail-wordmark">Staunch Connect</span>
+    <% end %>
+    <span class="tooltip-wrap" data-placement="bottom" data-keep>
+      <button type="button" class="icon-btn btn-ghost" data-size="sm" aria-label="Collapse sidebar" data-action="sidebar#toggle" data-sidebar-target="toggle"><svg class="icon" aria-hidden="true"><use href="#i-panel-left"/></svg></button>
+      <span class="tooltip" role="tooltip" data-sidebar-target="toggleTip">Collapse sidebar</span>
+    </span>
   </div>
 
-  <nav class="flex-1 flex flex-col gap-0.5 overflow-auto">
-    <%= sidebar_link "Home", root_path, icon: "house", active: current_page?(root_path) %>
+  <nav class="sidebar-nav" aria-label="Primary">
+    <a class="input rail-search" data-size="sm" href="<%= meetings_path %>" aria-label="Search" data-action="click->search#open:prevent">
+      <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><span class="rail-search-label">Search</span> <span class="caption">Ctrl K</span>
+    </a>
 
-    <%= sidebar_section "Consolidated Data" %>
-    <%= sidebar_link "Meetings", meetings_path, icon: "video-camera", active: controller_name == "meetings" %>
-    <%= sidebar_soon "Task 360°", icon: "squares-four" %>
-    <%= sidebar_soon "Search", icon: "magnifying-glass" %>
-    <%= sidebar_soon "Action Items", icon: "check-square" %>
+    <span class="tooltip-wrap" data-placement="right">
+      <%= link_to root_path, class: "nav-item", aria: { label: "Home", current: (current_page?(root_path) ? "page" : nil) } do %>
+        <svg class="icon rail-ic ic-layout-dashboard" viewBox="0 0 24 24" aria-hidden="true"><rect class="duo b1" width="7" height="9" x="3" y="3" rx="1"/><rect class="b2" width="7" height="5" x="14" y="3" rx="1"/><rect class="duo b3" width="7" height="9" x="14" y="12" rx="1"/><rect class="b4" width="7" height="5" x="3" y="16" rx="1"/></svg><span class="nav-label">Home</span>
+      <% end %>
+      <span class="tooltip" role="tooltip">Home</span>
+    </span>
 
-    <%= sidebar_section "Workflows" %>
-    <%= sidebar_link "Invoicing", invoices_path, icon: "receipt", active: controller_name == "invoices" %>
-    <%= sidebar_link "AI Assistant", ai_conversations_path, icon: "sparkle", active: controller_name == "ai_conversations" %>
+    <span class="tooltip-wrap" data-placement="right">
+      <%= link_to meetings_path, class: "nav-item", aria: { label: "Meetings", current: (controller_name == "meetings" ? "page" : nil) } do %>
+        <svg class="icon" aria-hidden="true"><use href="#i-video"/></svg><span class="nav-label">Meetings</span>
+      <% end %>
+      <span class="tooltip" role="tooltip">Meetings</span>
+    </span>
 
-    <%= sidebar_section "Workspace" %>
-    <%= sidebar_link "Settings", connections_path, icon: "gear-six", active: controller_name == "connections" %>
+    <span class="tooltip-wrap" data-placement="right">
+      <%= link_to invoices_path, class: "nav-item", aria: { label: "Invoicing", current: (controller_name == "invoices" ? "page" : nil) } do %>
+        <svg class="icon rail-ic ic-file" viewBox="0 0 24 24" aria-hidden="true"><path class="duo" d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path class="ln ln1" d="M8 13h8"/><path class="ln ln2" d="M8 17h5"/></svg><span class="nav-label">Invoicing</span>
+      <% end %>
+      <span class="tooltip" role="tooltip">Invoicing</span>
+    </span>
+
+    <span class="tooltip-wrap" data-placement="right">
+      <%= link_to ai_conversations_path, class: "nav-item", aria: { label: "AI Assistant", current: (controller_name == "ai_conversations" ? "page" : nil) } do %>
+        <svg class="icon rail-ic ic-sparkles" viewBox="0 0 24 24" aria-hidden="true"><path class="duo star" d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><g class="sp spa"><path d="M20 3v4"/><path d="M22 5h-4"/></g><g class="sp spb"><path d="M4 17v2"/><path d="M5 18H3"/></g></svg><span class="nav-label">AI Assistant</span>
+      <% end %>
+      <span class="tooltip" role="tooltip">AI Assistant</span>
+    </span>
+
+    <span class="tooltip-wrap" data-placement="right">
+      <%= link_to notifications_path, class: "nav-item", aria: { label: "Notifications", current: (controller_name == "notifications" ? "page" : nil) } do %>
+        <svg class="icon rail-ic ic-bell" viewBox="0 0 24 24" aria-hidden="true"><g class="bell-b"><path class="duo" d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></g><path class="clap" d="M10.268 21a2 2 0 0 0 3.464 0"/></svg><span class="nav-label">Notifications</span>
+      <% end %>
+      <span class="tooltip" role="tooltip">Notifications</span>
+    </span>
+
+    <span class="tooltip-wrap" data-placement="right">
+      <%= link_to task_360_path, class: "nav-item", aria: { label: "Task 360", current: (controller_name == "tasks" ? "page" : nil) } do %>
+        <svg class="icon" aria-hidden="true"><use href="#i-layout-grid"/></svg><span class="nav-label">Task 360</span>
+      <% end %>
+      <span class="tooltip" role="tooltip">Task 360</span>
+    </span>
   </nav>
 
-  <div class="border-t border-slate-200 pt-2 mt-2 flex items-center gap-2.5 p-2">
-    <span class="w-8 h-8 rounded-full bg-brand-50 text-brand-400 flex items-center justify-center font-semibold text-sm flex-none">
-      <%= Current.user.email_address.first.upcase %>
+  <div class="rail-bottom" data-controller="toggle theme" data-action="click@window->toggle#outside keydown.esc->toggle#hide">
+    <span class="tooltip-wrap" data-placement="right">
+      <button type="button" class="nav-item" aria-haspopup="menu" aria-expanded="false" aria-label="Account menu" data-toggle-target="trigger" data-action="toggle#toggle">
+        <span class="avatar" data-size="sm"><%= Current.user.initials %></span><span class="nav-label"><%= Current.user.first_name %></span>
+      </button>
+      <span class="tooltip" role="tooltip">Profile</span>
     </span>
-    <div class="min-w-0 overflow-hidden">
-      <div class="text-[13px] font-semibold text-slate-900 truncate"><%= Current.user.email_address %></div>
-      <%= button_to "Sign out", session_path, method: :delete, class: "text-xs text-slate-400 hover:text-slate-600 hover:underline p-0 bg-transparent border-0 cursor-pointer" %>
+
+    <div class="menu account-menu" role="menu" aria-label="Account" data-floating hidden data-toggle-target="panel">
+      <div class="account-head">
+        <span class="avatar" data-size="md"><%= Current.user.initials %></span>
+        <div class="account-who">
+          <p class="label-base"><%= Current.user.display_name %></p>
+          <p class="caption"><%= Current.user.email_address %></p>
+        </div>
+      </div>
+      <div class="menu-sep" role="separator"></div>
+      <div class="account-row">
+        <span class="label-base" id="pm-theme">Theme</span>
+        <div class="segmented" data-size="sm" role="radiogroup" aria-labelledby="pm-theme">
+          <button type="button" role="radio" class="segment" aria-checked="true" data-theme-target="light" data-action="theme#light"><%= icon "sun" %>Light</button>
+          <button type="button" role="radio" class="segment" aria-checked="false" data-theme-target="dark" data-action="theme#dark"><%= icon "moon" %>Dark</button>
+        </div>
+      </div>
+      <div class="menu-sep" role="separator"></div>
+      <%= link_to settings_path, role: "menuitem", class: "menu-item", data: { turbo_frame: "modal", action: "toggle#hide" } do %><%= icon "settings" %>Settings<% end %>
+      <div class="menu-sep" role="separator"></div>
+      <button type="button" role="menuitem" class="menu-item" data-action="dialogs#open toggle#hide" data-dialogs-name-param="signout"><%= icon "log-out" %>Sign out</button>
     </div>
   </div>
 </aside>

@@ -1,32 +1,28 @@
-<div class="w-[400px]">
-  <% if alert = flash[:alert] %>
-    <p class="py-2 px-3 bg-red-50 mb-5 text-red-500 font-medium rounded-lg" id="alert"><%= alert %></p>
-  <% end %>
+<% content_for :title, "Update password" %>
 
-  <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
-    <div class="flex flex-col items-center gap-1.5 mb-7">
-      <span class="w-11 h-11 rounded-xl bg-brand-400 text-white flex items-center justify-center font-display font-extrabold text-xl">S</span>
-      <div class="font-display font-extrabold text-[22px] text-slate-900 mt-2">Update your password</div>
+<div class="auth-card">
+  <div class="auth-head">
+    <span class="avatar" data-tone="brand">SC</span>
+    <h1 class="page-title">Update your password</h1>
+  </div>
+
+  <%= tag.div flash_alerts, class: "flash-stack" if flash[:alert] %>
+
+  <%= form_with url: password_path(params[:token]), method: :put, class: "form-stack" do |form| %>
+    <div class="field">
+      <label class="field-label" for="password">New password</label>
+      <div class="input" data-size="lg">
+        <%= form.password_field :password, id: "password", required: true, autocomplete: "new-password", placeholder: "Enter new password", maxlength: 72 %>
+      </div>
     </div>
 
-    <%= form_with url: password_path(params[:token]), method: :put, class: "flex flex-col gap-4" do |form| %>
-      <div>
-        <label class="block text-sm font-medium text-slate-900 mb-1.5" for="password">New Password</label>
-        <div class="flex items-center gap-2 h-11 px-3.5 bg-slate-50 border border-slate-200 rounded-xl focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-400/20">
-          <i class="ph ph-lock-key text-lg text-slate-400"></i>
-          <%= form.password_field :password, id: "password", required: true, autocomplete: "new-password", placeholder: "Enter new password", maxlength: 72, class: "flex-1 min-w-0 border-0 outline-none bg-transparent text-[15px] text-slate-900 placeholder:text-slate-400" %>
-        </div>
+    <div class="field">
+      <label class="field-label" for="password_confirmation">Confirm password</label>
+      <div class="input" data-size="lg">
+        <%= form.password_field :password_confirmation, id: "password_confirmation", required: true, autocomplete: "new-password", placeholder: "Repeat new password", maxlength: 72 %>
       </div>
+    </div>
 
-      <div>
-        <label class="block text-sm font-medium text-slate-900 mb-1.5" for="password_confirmation">Confirm Password</label>
-        <div class="flex items-center gap-2 h-11 px-3.5 bg-slate-50 border border-slate-200 rounded-xl focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-400/20">
-          <i class="ph ph-lock-key text-lg text-slate-400"></i>
-          <%= form.password_field :password_confirmation, id: "password_confirmation", required: true, autocomplete: "new-password", placeholder: "Repeat new password", maxlength: 72, class: "flex-1 min-w-0 border-0 outline-none bg-transparent text-[15px] text-slate-900 placeholder:text-slate-400" %>
-        </div>
-      </div>
-
-      <%= form.submit "Save", class: "w-full h-11 rounded-lg bg-brand-400 hover:bg-brand-500 text-white font-semibold text-sm cursor-pointer mt-1" %>
-    <% end %>
-  </div>
+    <%= form.button "Save password", type: :submit, class: "btn btn-primary btn-block", data: { size: "lg" } %>
+  <% end %>
 </div>

@@ -1,112 +1,133 @@
-<% content_for :title, "Invoicing" %>
-<% content_for :subtitle do %><%= @mapping.clickup_folder_name.presence || @mapping.clickup_space_name.presence || @clickup_space_id %> reconciliation<% end %>
+<% content_for :title, "Review invoice" %>
+<%
+  est = @total_estimate_hours
+  logged = @total_logged_hours
+  compared = @hub_id.present?
+  diff = compared ? logged - est : nil
+  pct = compared && est.positive? ? (logged / est * 100).round : 0
+  cmp_text = pct > 100 ? "#{pct - 100}% over" : (pct < 100 ? "#{100 - pct}% under" : "On estimate")
+  cmp_tone = pct > 120 ? "danger" : (pct > 100 ? "warning" : "success")
+  diff_note = diff.to_f > 0 ? "Hubstaff has more hours than ClickUp" : (diff.to_f < 0 ? "Hubstaff has fewer hours than ClickUp" : "Hubstaff matches ClickUp")
+  setup_for_edit = @setup.merge("step" => 3, "mode" => "review", "month" => @month, "rate" => number_with_precision(@rate, precision: 2), "hubstaff_project_value" => (compared ? "#{@hub_id}|#{@hub_name}" : "none"))
+%>
 
-<div class="p-8 flex flex-col gap-6">
-  <% if alert = flash[:alert] %>
-    <p class="py-2 px-3 bg-red-50 text-red-500 font-medium rounded-lg inline-block"><%= alert %></p>
-  <% end %>
+<header class="page-header">
+  <div>
+    <h1 class="page-title">Review</h1>
+    <p class="page-desc"><%= @project_name %> · <%= Date.strptime(@month, "%Y-%m").strftime("%B %Y") %></p>
+  </div>
+  <div class="page-actions">
+    <%= link_to invoicing_path(setup_for_edit), class: "btn btn-ghost", data: { turbo_frame: "modal" } do %><%= icon "pencil" %>Edit setup<% end %>
+  </div>
+</header>
 
-  <%= form_with url: invoicing_draft_path, method: :get, class: "flex items-center justify-between gap-3 flex-wrap" do |form| %>
-    <%= form.hidden_field :clickup_space_id, value: @clickup_space_id %>
-    <%= form.hidden_field :clickup_folder_id, value: @clickup_folder_id %>
-    <% @list_ids.each do |list_id| %>
-      <%= hidden_field_tag "list_ids[]", list_id %>
-    <% end %>
+<%= tag.div flash_alerts, class: "flash-stack" if flash[:alert] %>
 
-    <div class="text-sm text-slate-600">
-      Mapped to Hubstaff project "<%= @mapping.hubstaff_project_name %>"
-    </div>
-
-    <div class="flex items-center gap-2">
-      <label class="text-sm text-slate-600" for="month">Billing Period</label>
-      <select name="month" id="month" onchange="this.form.requestSubmit()" class="h-9 px-3 rounded-lg border border-slate-200 bg-white text-sm text-slate-900">
-        <% @month_options.each do |value, label| %>
-          <option value="<%= value %>" <%= "selected" if value == @month %>><%= label %></option>
-        <% end %>
+<div class="review-meta">
+  <p class="body-sm" style="margin:0;color:var(--fg-secondary)">
+    <% if compared %>Compared with Hubstaff project &ldquo;<%= @hub_name %>&rdquo;<% else %>Not compared with Hubstaff<% end %>
+  </p>
+  <%= form_with url: invoicing_draft_path, method: :get, class: "period" do |form| %>
+    <%= render "invoices/setup/carry", except: %w[month step mode] %>
+    <label class="body-sm" style="color:var(--fg-secondary)" for="rv-m">Billing period</label>
+    <div class="select">
+      <select id="rv-m" name="month" onchange="this.form.requestSubmit()">
+        <% @month_options.each do |value, label| %><option value="<%= value %>" <%= "selected" if value == @month %>><%= label %></option><% end %>
       </select>
+      <%= icon "chevron-down" %>
     </div>
   <% end %>
+</div>
 
-  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl">
-    <div class="bg-white border border-slate-200 rounded-2xl p-4">
-      <div class="text-xs text-slate-400">Estimated</div>
-      <div class="mt-1 font-display font-bold text-2xl text-slate-900"><%= number_with_precision(@total_estimate_hours, precision: 1) %>h</div>
-    </div>
-    <div class="bg-white border border-slate-200 rounded-2xl p-4">
-      <div class="text-xs text-slate-400">Logged (Hubstaff)</div>
-      <div class="mt-1 font-display font-bold text-2xl text-slate-900"><%= number_with_precision(@total_logged_hours, precision: 1) %>h</div>
-    </div>
-    <div class="bg-white border border-slate-200 rounded-2xl p-4">
-      <div class="text-xs text-slate-400">Invoice Total</div>
-      <div class="mt-1 font-display font-bold text-2xl text-slate-900"><%= number_to_currency(@total_amount) %></div>
-    </div>
-  </div>
-
-  <% unless @mapping.default_hourly_rate %>
-    <p class="text-sm text-slate-500 -mt-2">
-      No hourly rate set for this project yet — amounts show as $0.00 until you set one on the
-      <%= link_to "project mapping", invoicing_path(clickup_space_id: @clickup_space_id, clickup_folder_id: @clickup_folder_id), class: "text-brand-400 hover:text-brand-500 font-medium" %>.
-    </p>
-  <% end %>
-
-  <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-    <div class="grid grid-cols-[1fr_120px_90px_90px_110px] gap-3 px-4 py-3 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
-      <div>Task</div>
-      <div>Ticket</div>
-      <div>Estimate</div>
-      <div>Rate</div>
-      <div>Amount</div>
-    </div>
-
-    <% if @line_items.empty? %>
-      <div class="px-4 py-6 text-sm text-slate-500">No tasks found in the selected list(s).</div>
-    <% else %>
-      <% @line_items.each do |item| %>
-        <% amount = (item[:estimate_hours] || 0) * (@mapping.default_hourly_rate || 0) %>
-        <% subtask_titles = item[:notes].to_s.split("\n").map { |line| line.delete_prefix("• ") } %>
-        <div class="border-t border-slate-200">
-          <div class="grid grid-cols-[1fr_120px_90px_90px_110px] gap-3 px-4 py-3 text-sm">
-            <div class="text-slate-900 font-medium truncate"><%= item[:title] %></div>
-            <div class="text-slate-500 font-mono text-xs truncate"><%= item[:ticket] %></div>
-            <div class="text-slate-900"><%= item[:estimate_hours] ? "#{number_with_precision(item[:estimate_hours], precision: 1)}h" : "—" %></div>
-            <div class="text-slate-900"><%= @mapping.default_hourly_rate ? number_to_currency(@mapping.default_hourly_rate) : "—" %></div>
-            <div class="text-slate-900 font-medium"><%= number_to_currency(amount) %></div>
-          </div>
-          <% if subtask_titles.any? %>
-            <details class="px-4 pb-3 -mt-1">
-              <summary class="text-xs font-semibold text-brand-400 hover:text-brand-500 cursor-pointer select-none">
-                <%= pluralize(subtask_titles.size, "subtask") %>
-              </summary>
-              <ul class="mt-2 pl-5 list-disc text-sm text-slate-600 space-y-1">
-                <% subtask_titles.each do |title| %>
-                  <li><%= title %></li>
-                <% end %>
-              </ul>
-            </details>
-          <% end %>
-        </div>
+<div class="stats stats-4">
+  <div class="stat-cell"><div class="stat"><span class="stat-label">ClickUp estimate</span><span class="stat-value"><%= number_with_precision(est, precision: 1) %> h</span><div class="stat-foot"><span><%= pluralize(@line_items.size, "task") %></span></div></div></div>
+  <div class="stat-cell"><div class="stat"><span class="stat-label">Hubstaff logged</span><span class="stat-value"><%= compared ? "#{number_with_precision(logged, precision: 1)} h" : "—" %></span><div class="stat-foot"><span><%= compared ? Date.strptime(@month, "%Y-%m").strftime("%B %Y") : "Not compared" %></span></div></div></div>
+  <div class="stat-cell"><div class="stat">
+    <span class="stat-label stat-label-info">Difference
+      <span class="tooltip-wrap" data-placement="bottom">
+        <button type="button" class="icon-btn btn-ghost" data-size="sm" aria-label="What the difference means" aria-describedby="tp-diff"><%= icon "info" %></button>
+        <span class="tooltip" role="tooltip" id="tp-diff">Hubstaff logged hours minus ClickUp estimated hours. A plus means the team logged more time than estimated, a minus means less. &ldquo;42% over&rdquo; means Hubstaff is 42% above the ClickUp estimate.</span>
+      </span>
+    </span>
+    <span class="stat-value"><%= compared ? "#{diff.positive? ? '+' : (diff.negative? ? '−' : '')}#{number_with_precision(diff.abs, precision: 1)} h" : "—" %></span>
+    <div class="stat-foot">
+      <% if compared %>
+        <span class="tooltip-wrap" data-placement="bottom">
+          <span class="badge" tabindex="0" data-tone="<%= cmp_tone %>" aria-describedby="tp-note"><%= cmp_text %></span>
+          <span class="tooltip" role="tooltip" id="tp-note"><%= diff_note %></span>
+        </span>
+      <% else %>
+        <span>Not compared</span>
       <% end %>
+    </div>
+  </div></div>
+  <div class="stat-cell"><div class="stat"><span class="stat-label">Invoice total</span><span class="stat-value"><%= number_to_currency(@total_amount) %></span><div class="stat-foot"><span><%= number_to_currency(@rate) %> per hour</span></div></div></div>
+</div>
 
-      <div class="grid grid-cols-[1fr_120px_90px_90px_110px] gap-3 px-4 py-3 border-t border-slate-200 text-sm bg-slate-50 font-semibold text-slate-900">
-        <div class="col-span-4 text-right">Total</div>
-        <div><%= number_to_currency(@total_amount) %></div>
-      </div>
-    <% end %>
+<% unless @rate.positive? %>
+  <div class="alert" role="status" data-tone="warning">
+    <%= icon "triangle-alert" %>
+    <div class="alert-content">No hourly rate is set, so amounts show as $0.00. Use Edit setup to set one.</div>
   </div>
+<% end %>
 
-  <div class="flex items-center justify-between">
-    <%= link_to "Back to project", invoicing_path(clickup_space_id: @clickup_space_id, clickup_folder_id: @clickup_folder_id), class: "text-sm text-slate-500 hover:text-slate-700" %>
-
-    <% if @line_items.any? %>
-      <%= form_with url: invoices_path, method: :post do |form| %>
-        <%= form.hidden_field :clickup_space_id, value: @clickup_space_id %>
-        <%= form.hidden_field :clickup_folder_id, value: @clickup_folder_id %>
-        <% @list_ids.each do |list_id| %>
-          <%= hidden_field_tag "list_ids[]", list_id %>
+<div class="table-card">
+  <div class="table-scroll" tabindex="0" role="region" aria-label="Reconciliation">
+    <table class="table">
+      <caption class="sr-only">Tasks from the chosen lists with ticket, ClickUp estimate, rate and amount. Review only.</caption>
+      <thead>
+        <tr>
+          <th scope="col">Task</th>
+          <th scope="col">Ticket</th>
+          <th scope="col" class="num">Estimate</th>
+          <th scope="col" class="num">Rate</th>
+          <th scope="col" class="num">Amount</th>
+        </tr>
+      </thead>
+      <% if @line_items.empty? %>
+        <tbody><tr><td colspan="5" class="cell-secondary">No tasks found in the selected list(s).</td></tr></tbody>
+      <% else %>
+        <% @line_items.each do |item| %>
+          <% subtasks = item[:notes].to_s.split("\n").map { |line| line.delete_prefix("• ") }.reject(&:blank?) %>
+          <tbody data-controller="toggle">
+            <tr>
+              <td>
+                <div class="cell-with-action">
+                  <span><%= item[:title] %></span>
+                  <% if subtasks.any? %>
+                    <button type="button" class="btn btn-ghost" data-size="sm" aria-expanded="false" data-toggle-target="trigger" data-action="toggle#toggle"><%= pluralize(subtasks.size, "subtask") %><%= icon "chevron-down" %></button>
+                  <% end %>
+                </div>
+              </td>
+              <td class="cell-secondary code"><%= item[:ticket] %></td>
+              <td class="cell-secondary num"><%= item[:estimate_hours] ? "#{number_with_precision(item[:estimate_hours], precision: 1)} h" : "—" %></td>
+              <td class="cell-secondary num"><%= number_to_currency(@rate) %></td>
+              <td class="num"><%= number_to_currency((item[:estimate_hours] || 0) * @rate) %></td>
+            </tr>
+            <% subtasks.each do |title| %>
+              <tr class="sub-row" hidden data-toggle-target="panel">
+                <td style="padding-inline-start:var(--space-32)"><span class="body-sm" style="color:var(--fg-secondary)"><%= title %></span></td>
+                <td></td><td></td><td></td><td></td>
+              </tr>
+            <% end %>
+          </tbody>
         <% end %>
-        <%= form.hidden_field :month, value: @month %>
-        <%= form.submit "Save as Invoice", class: "h-10 px-4 rounded-lg bg-brand-400 hover:bg-brand-500 text-white font-semibold text-sm cursor-pointer" %>
       <% end %>
-    <% end %>
+      <tfoot>
+        <tr><td></td><td></td><td></td><td class="num" style="font-weight:600">Total</td><td class="num" style="font-weight:600"><%= number_to_currency(@total_amount) %></td></tr>
+      </tfoot>
+    </table>
   </div>
 </div>
+
+<% if @line_items.any? %>
+  <div class="actions-end">
+    <%= form_with url: invoices_path, method: :post do |form| %>
+      <%= render "invoices/setup/carry", except: %w[month rate hubstaff_project_value step mode] %>
+      <%= hidden_field_tag :month, @month, id: nil %>
+      <%= hidden_field_tag :rate, number_with_precision(@rate, precision: 2), id: nil %>
+      <%= hidden_field_tag :hubstaff_project_value, (compared ? "#{@hub_id}|#{@hub_name}" : "none"), id: nil %>
+      <%= form.button "Save as invoice", type: :submit, class: "btn btn-primary" %>
+    <% end %>
+  </div>
+<% end %>

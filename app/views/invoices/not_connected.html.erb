@@ -1,27 +1,14 @@
 <% content_for :title, "Invoicing" %>
-<% content_for :subtitle do %>Select a client and billing period to build a reconciliation<% end %>
 
-<div class="h-full flex items-center justify-center p-8">
-  <div class="w-full max-w-[520px] bg-white border border-slate-200 rounded-2xl shadow-sm p-7">
-    <div class="flex items-start gap-3">
-      <span class="flex-none w-10 h-10 rounded-xl bg-brand-50 text-brand-400 flex items-center justify-center">
-        <i class="ph ph-plugs-connected text-xl"></i>
-      </span>
-      <div class="min-w-0">
-        <div class="font-bold text-base text-slate-900">Connect Hubstaff and ClickUp first</div>
-        <div class="mt-0.5 text-sm text-slate-600 leading-relaxed">
-          Invoicing needs both sources connected — one for estimates, one for logged hours.
-          <% unless @clickup_connection&.connected? %>ClickUp isn't connected.<% end %>
-          <% unless @hubstaff_connection&.connected? %>Hubstaff isn't connected.<% end %>
-        </div>
-      </div>
-    </div>
+<header class="page-header"><h1 class="page-title">Invoicing</h1></header>
 
-    <div class="mt-6">
-      <%= link_to connections_path, class: "inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-brand-400 hover:bg-brand-500 text-white font-semibold text-sm" do %>
-        <i class="ph ph-gear-six text-lg"></i>
-        Go to Connector Settings
-      <% end %>
-    </div>
-  </div>
+<div class="empty" data-variant="bordered">
+  <div class="empty-icon"><%= icon "plug" %></div>
+  <h3 class="empty-title">Connect Hubstaff and ClickUp first</h3>
+  <p class="empty-desc">
+    Invoicing needs both sources connected: one for estimates, one for logged hours.
+    <% unless @clickup_connection&.connected? %>ClickUp isn't connected.<% end %>
+    <% unless @hubstaff_connection&.connected? %>Hubstaff isn't connected.<% end %>
+  </p>
+  <div class="empty-actions"><%= link_to "Go to connector settings", settings_path(section: "connectors"), class: "btn btn-primary", data: { turbo_frame: "modal" } %></div>
 </div>

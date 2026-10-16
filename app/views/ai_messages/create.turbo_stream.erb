@@ -1,7 +1,10 @@
+<%= turbo_stream.remove_all "[data-optimistic]" %>
 <%= turbo_stream.remove "empty_hint" %>
 
 <% @new_messages.each do |message| %>
   <%= turbo_stream.before "chat_bottom", partial: "ai_conversations/message", locals: { message: message } %>
 <% end %>
 
-<%= turbo_stream.replace "message_form", partial: "ai_conversations/message_form", locals: { conversation: @conversation } %>
+<%= turbo_stream.replace "message_form", partial: "ai_conversations/composer", locals: { url: ai_conversation_messages_path(@conversation), enabled: true } %>
+<%= turbo_stream.update "cx_head", partial: "ai_conversations/cx_head", locals: { conversation: @conversation, title: (@conversation.title.presence || "New chat"), sub: assistant_sub } %>
+<%= turbo_stream.replace "chat_list", partial: "ai_conversations/chat_list", locals: { conversations: @conversations, current: @conversation, query: "" } %>

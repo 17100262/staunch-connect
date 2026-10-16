@@ -1,5 +1,14 @@
 class Connection < ApplicationRecord
-  SOURCES = %w[hubstaff clickup fathom].freeze
+  # Sources whose data the app reads.
+  DATA_SOURCES = %w[hubstaff clickup fathom].freeze
+  # Plus the Anthropic API key that powers the AI Assistant (managed in Settings > Connectors).
+  SOURCES = (DATA_SOURCES + %w[anthropic]).freeze
+
+  # The API key saved in Settings, when the connection is set up.
+  def self.anthropic_key
+    connection = find_by(source: "anthropic")
+    connection.credential.presence if connection&.connected?
+  end
 
   encrypts :credential
   encrypts :access_token

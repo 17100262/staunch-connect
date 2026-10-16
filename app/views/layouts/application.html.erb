@@ -4,17 +4,29 @@
     <%= render "layouts/head" %>
   </head>
 
-  <body class="h-screen w-screen m-0 bg-slate-50 font-sans antialiased">
-    <div class="flex h-full">
+  <body>
+    <%= render "shared/icons" %>
+
+    <div class="app" data-layout="panel" <%= "data-fixed" if content_for?(:full_bleed) %> data-controller="sidebar search dialogs" data-action="keydown@window->search#shortcut">
       <%= render "layouts/sidebar" %>
 
-      <div class="flex-1 min-w-0 h-full flex flex-col overflow-auto">
-        <%= render "layouts/topbar" %>
-
-        <main class="flex-1">
-          <%= yield %>
-        </main>
+      <div class="app-main">
+        <div class="app-body">
+          <%= yield :topbar %>
+          <% if content_for?(:full_bleed) %>
+            <%= yield %>
+          <% else %>
+            <main class="page <%= yield :page_class %>">
+              <%= yield %>
+            </main>
+          <% end %>
+        </div>
       </div>
+
+      <%= render "layouts/search_dialog" %>
+      <%= render "layouts/signout_dialog" %>
+      <turbo-frame id="modal"<%= %( src="#{ERB::Util.html_escape(@modal_src)}").html_safe if @modal_src %>></turbo-frame>
+      <%= render "shared/toast" %>
     </div>
   </body>
 </html>

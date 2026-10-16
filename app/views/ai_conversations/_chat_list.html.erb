@@ -1,0 +1,53 @@
+<%# Locals: conversations, current (AiConversation or nil), query. Lives in the chat_list Turbo Frame so search updates only the list. %>
+<turbo-frame id="chat_list" target="_top" class="chat-list-frame">
+  <aside class="chat-list cx-list" aria-label="Chats" data-controller="toggle">
+    <div class="chat-list-head">
+      <h2 class="chat-list-title">Chats</h2>
+      <div class="chat-list-actions">
+        <button type="button" class="icon-btn btn-ghost" data-size="sm" aria-label="Search chats" aria-expanded="<%= query.present? %>" data-toggle-target="trigger" data-action="toggle#toggle"><%= icon "search" %></button>
+        <%= link_to ai_conversations_path, class: "icon-btn btn-primary", data: { size: "sm" }, aria: { label: "New chat" } do %><%= icon "pencil" %><% end %>
+      </div>
+    </div>
+    <div class="chat-list-search" role="search" data-toggle-target="panel" <%= "hidden" if query.blank? %>>
+      <%= form_with url: ai_conversations_path, method: :get, data: { turbo_frame: "chat_list", turbo_action: "advance_off", controller: "autosubmit", action: "input->autosubmit#queue" } do %>
+        <div class="input" data-size="sm">
+          <%= icon "search" %>
+          <input type="search" name="q" value="<%= query %>" placeholder="Search chats" aria-label="Search chats" autocomplete="off">
+        </div>
+      <% end %>
+    </div>
+    <div class="chat-list-items">
+      <% if conversations.empty? %>
+        <% if query.present? %>
+          <div class="empty" data-size="sm">
+            <div class="empty-icon"><%= icon "search" %></div>
+            <h3 class="empty-title">No chats match &ldquo;<%= query %>&rdquo;</h3>
+            <p class="empty-desc">Search looks at chat titles and messages.</p>
+            <div class="empty-actions"><%= link_to "Clear search", ai_conversations_path, class: "btn btn-secondary", data: { size: "sm", turbo_frame: "chat_list" } %></div>
+          </div>
+        <% else %>
+          <div class="empty" data-size="sm">
+            <div class="empty-icon"><%= icon "message-circle" %></div>
+            <h3 class="empty-title">No chats yet</h3>
+            <p class="empty-desc">Your conversations will be listed here.</p>
+          </div>
+        <% end %>
+      <% else %>
+        <% chat_groups(conversations).each do |label, group| %>
+          <div class="chat-group">
+            <p class="chat-group-label caption"><%= label %></p>
+            <% group.each do |conversation| %>
+              <%= link_to ai_conversation_path(conversation), class: "chat-row", aria: { current: (current&.id == conversation.id ? "true" : nil) } do %>
+                <span class="chat-row-top">
+                  <span class="chat-row-name"><%= conversation.title.presence || "New chat" %></span>
+                  <span class="chat-row-time"><%= conversation.updated_at.strftime("%-I:%M %P") %></span>
+                </span>
+                <span class="chat-row-text"><%= conversation.updated_at.strftime("%b %-d, %Y") %></span>
+              <% end %>
+            <% end %>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+  </aside>
+</turbo-frame>

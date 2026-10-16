@@ -1,0 +1,13 @@
+<div class="nv-gate">
+  <section class="banner" data-layout="stacked" aria-labelledby="bn-ai">
+    <div class="banner-body">
+      <h2 class="banner-title" id="bn-ai">Add your Anthropic key to start chatting</h2>
+      <p class="banner-desc">The assistant uses Claude to read your invoices and meetings and write the answers. Add an API key once and ask away.</p>
+      <div class="banner-actions"><%= link_to settings_path(section: "connectors"), class: "btn btn-primary", data: { turbo_frame: "modal" } do %><%= icon "plus" %>Add Anthropic key<% end %></div>
+    </div>
+    <div class="banner-aside">
+      <span class="avatar-group"><span class="avatar" data-size="lg" data-tone="brand">AI</span></span>
+      <span class="caption">Anthropic</span>
+    </div>
+  </section>
+</div>

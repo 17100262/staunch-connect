@@ -1,82 +1,190 @@
 <% content_for :title, "Meetings" %>
-<% content_for :subtitle do %>Transcripts and summaries synced from Fathom<% end %>
+<%
+  syncing = @fathom&.syncing?
+  range_labels = { "7" => "Last 7 days", "30" => "Last 30 days", "all" => "Any time" }
+  people_label = @selected_people.first.then { |v| @people.find { |p| p[:value] == v }&.dig(:label) || v }
+%>
 
-<div class="p-8 flex flex-col gap-6">
-  <% if @meetings.empty? && @query.blank? %>
-    <div class="h-full flex items-center justify-center p-8">
-      <div class="w-full max-w-[480px] bg-white border border-slate-200 rounded-2xl shadow-sm p-7">
-        <div class="flex items-start gap-3">
-          <span class="flex-none w-10 h-10 rounded-xl bg-brand-50 text-brand-400 flex items-center justify-center">
-            <i class="ph ph-video-camera text-xl"></i>
-          </span>
-          <div class="min-w-0">
-            <div class="font-bold text-base text-slate-900">No meetings yet</div>
-            <div class="mt-0.5 text-sm text-slate-600 leading-relaxed">
-              Connect Fathom in Settings, then click "Sync Now" to pull in your meetings — new ones will sync automatically from there.
-            </div>
-          </div>
-        </div>
+<header class="page-header">
+  <h1 class="page-title">Meetings</h1>
+  <% if @fathom&.connected? || syncing %>
+    <div class="page-actions">
+      <%= button_to sync_connection_path(@fathom), params: { return_to: meetings_path }, method: :post, class: "btn btn-secondary", disabled: syncing, form: { class: "inline-form" } do %>
+        <% if syncing %><svg class="spinner" data-size="sm" aria-hidden="true"><use href="#i-loader"/></svg>Syncing…<% else %><%= icon "rotate-cw" %>Sync from Fathom<% end %>
+      <% end %>
+    </div>
+  <% end %>
+</header>
 
-        <div class="mt-6">
-          <%= link_to "Connect Fathom", connections_path, class: "inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-brand-400 hover:bg-brand-500 text-white font-semibold text-sm" %>
+<%= tag.div flash_alerts, class: "flash-stack" if flash[:alert] %>
+<% if syncing %><span data-controller="poll"><span data-poll-target="active" hidden></span></span><% end %>
+
+<% if @fathom&.status == "error" %>
+  <div class="alert" role="alert" data-tone="danger">
+    <%= icon "circle-alert" %>
+    <div class="alert-content">
+      <div class="alert-title">Fathom needs attention</div>
+      <div><%= @fathom.last_error %> <%= link_to "Reconnect Fathom", settings_path(section: "connectors"), class: "link", data: { turbo_frame: "modal" } %>.</div>
+    </div>
+  </div>
+<% end %>
+
+<% if !@has_meetings %>
+  <% if @fathom.nil? || @fathom.status == "disconnected" %>
+    <section class="banner nv-gate" aria-labelledby="bn-meet">
+      <div class="banner-body">
+        <h2 class="banner-title" id="bn-meet">Meetings start with Fathom</h2>
+        <p class="banner-desc">Connect Fathom and every call you record shows up here with its summary, key takeaways and transcript.</p>
+        <div class="banner-actions"><%= link_to settings_path(section: "connectors"), class: "btn btn-primary", data: { turbo_frame: "modal" } do %><%= icon "plus" %>Connect Fathom<% end %></div>
+      </div>
+      <div class="banner-aside">
+        <span class="avatar-group"><span class="avatar" data-size="lg" data-tone="success">FA</span></span>
+        <span class="caption">Fathom</span>
+      </div>
+    </section>
+    <div class="ghost-table" aria-hidden="true">
+      <% 4.times do |i| %>
+        <div class="ghost-row">
+          <span class="skeleton" data-shape="text" style="width:<%= [ 70, 55, 80, 45 ][i] %>%"></span>
+          <span class="skeleton" data-shape="text" style="width:60%"></span>
+          <span class="skeleton" data-shape="text" style="width:50%"></span>
         </div>
+      <% end %>
+    </div>
+    <p class="caption ghost-note"><%= icon "clock" %>Your meetings will appear here once Fathom is connected</p>
+  <% else %>
+    <div class="empty" data-variant="bordered">
+      <div class="empty-icon"><%= icon "video" %></div>
+      <h3 class="empty-title"><%= syncing ? "Pulling in your meetings" : "No meetings yet" %></h3>
+      <p class="empty-desc"><%= syncing ? "This can take a minute the first time. The list fills in as meetings arrive." : "Fathom is connected but nothing has synced yet. Sync now to pull in your meetings. New ones arrive on their own after that." %></p>
+    </div>
+  <% end %>
+<% else %>
+  <%= form_with url: meetings_path, method: :get, class: "filter-bar", role: "search", data: { controller: "filters autosubmit" } do |form| %>
+    <%= hidden_field_tag :ai, (@only_actions ? "1" : ""), id: nil, data: { filters_target: "ai" } %>
+    <%= hidden_field_tag :range, @range, id: nil, data: { filters_target: "range" } %>
+    <%= hidden_field_tag :page, "", id: nil, data: { filters_target: "page" } %>
+    <% @selected_people.each do |person| %><%= hidden_field_tag "attendees[]", person, id: nil, data: { filters_target: "attendees" } %><% end %>
+
+    <button type="button" class="chip" data-size="md" aria-pressed="<%= @only_actions %>" data-action="filters#toggleAi"><%= icon "check", class: "chip-check" %>Has action items</button>
+
+    <div class="filter" data-controller="toggle" data-action="click@window->toggle#outside keydown.esc->toggle#hide">
+      <button type="button" class="chip" data-size="md" aria-haspopup="menu" aria-expanded="false" data-toggle-target="trigger" data-action="toggle#toggle"><%= icon "calendar" %><span><%= range_labels[@range] %></span><%= icon "chevron-down", class: "chip-chev" %></button>
+      <div class="menu" role="menu" aria-label="Date range" data-floating style="inset-block-start:calc(100% + var(--space-4));inset-inline-start:0" hidden data-toggle-target="panel">
+        <% range_labels.each do |value, label| %>
+          <button type="button" role="menuitemradio" class="menu-item" aria-checked="<%= @range == value %>" data-action="filters#setRange toggle#hide" data-filters-value-param="<%= value %>"><span><%= label %></span><span class="menu-item-check"><%= icon "check" %></span></button>
+        <% end %>
       </div>
     </div>
-  <% else %>
-    <%= form_with url: meetings_path, method: :get, class: "flex items-center gap-3" do |form| %>
-      <div class="relative w-full max-w-sm">
-        <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-        <%= form.text_field :q, value: @query, placeholder: "Search by title or attendee…",
-              class: "w-full h-10 pl-9 pr-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-brand-400" %>
-      </div>
-      <%= form.submit "Search", class: "h-10 px-4 rounded-lg text-sm font-semibold bg-white border border-slate-200 text-slate-900 hover:bg-slate-50 cursor-pointer" %>
-      <% if @query.present? %>
-        <%= link_to "Clear", meetings_path, class: "text-sm font-semibold text-slate-500 hover:text-slate-700" %>
-      <% end %>
-    <% end %>
 
-    <% if @meetings.empty? %>
-      <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 text-sm text-slate-600">
-        No meetings match "<%= @query %>".
+    <div class="filter" data-controller="toggle" data-action="click@window->toggle#outside keydown.esc->toggle#hide">
+      <% if @selected_people.any? %>
+        <span class="chip" data-variant="split" data-size="md" data-active="data-active" role="group" aria-label="Attendees filter">
+          <button type="button" class="chip-main" aria-haspopup="menu" aria-expanded="false" data-toggle-target="trigger" data-action="toggle#toggle"><%= icon "users" %><span class="chip-value"><%= people_label %><%= " +#{@selected_people.size - 1}" if @selected_people.size > 1 %></span></button>
+          <button type="button" class="chip-x" aria-label="Clear attendees filter" data-action="filters#clearPeople"><%= icon "x" %></button>
+        </span>
+      <% else %>
+        <span class="chip" data-variant="split" data-size="md" role="group" aria-label="Attendees filter">
+          <button type="button" class="chip-main" aria-haspopup="menu" aria-expanded="false" data-toggle-target="trigger" data-action="toggle#toggle"><%= icon "users" %><span class="chip-label">Attendees</span><%= icon "chevron-down", class: "chip-chev" %></button>
+        </span>
+      <% end %>
+      <div class="menu" role="menu" aria-label="Attendees" data-floating style="inset-block-start:calc(100% + var(--space-4));inset-inline-start:0;max-height:320px;overflow:auto" hidden data-toggle-target="panel">
+        <div class="menu-label caption">Show meetings with</div>
+        <% if @people.empty? %><p class="caption" style="padding:var(--space-8) var(--space-12);margin:0">No attendees yet.</p><% end %>
+        <% @people.each do |person| %>
+          <button type="button" role="menuitemcheckbox" class="menu-item" aria-checked="<%= @selected_people.include?(person[:value]) %>" data-action="filters#togglePerson" data-filters-value-param="<%= person[:value] %>">
+            <span class="avatar" data-size="xs" data-tone="<%= person_tone(person[:label]) %>"><%= person_initials(person[:label]).first %></span>
+            <span><%= person[:label] %></span>
+            <span class="menu-item-check"><%= icon "check" %></span>
+          </button>
+        <% end %>
+        <% if @selected_people.any? %>
+          <div class="menu-sep" role="separator"></div>
+          <button type="button" role="menuitem" class="menu-item" data-action="filters#clearPeople">Clear selection</button>
+        <% end %>
       </div>
-    <% else %>
-    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm border-collapse table-fixed">
-          <colgroup>
-            <col>
-            <col style="width: 150px">
-            <col style="width: 240px">
-            <col style="width: 90px">
-          </colgroup>
+    </div>
+
+    <div class="input" data-size="sm">
+      <%= icon "search" %>
+      <input type="search" name="q" value="<%= @query %>" placeholder="Search by title or attendee" aria-label="Search meetings by title or attendee" autocomplete="off" data-action="input->autosubmit#queue">
+    </div>
+  <% end %>
+
+  <% if @meetings.empty? %>
+    <div class="empty">
+      <div class="empty-icon"><%= icon "search" %></div>
+      <h3 class="empty-title"><%= @query.present? ? "No meetings match “#{@query}”" : "No meetings match these filters" %></h3>
+      <p class="empty-desc">Search covers titles and attendees. Try a shorter word, widen the dates, or sync again if the call is recent.</p>
+      <div class="empty-actions"><%= link_to "Clear filters", meetings_path, class: "btn btn-secondary" %></div>
+    </div>
+  <% else %>
+    <div class="table-card" data-variant="open">
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Meetings">
+        <table class="table">
+          <caption class="sr-only">Meetings synced from Fathom</caption>
           <thead>
-            <tr class="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
-              <th class="text-left px-4 py-3 font-semibold">Meeting</th>
-              <th class="text-left px-4 py-3 font-semibold">Date</th>
-              <th class="text-left px-4 py-3 font-semibold">Attendees</th>
-              <th class="px-4 py-3"><span class="sr-only">Actions</span></th>
+            <tr>
+              <th scope="col">Meeting</th>
+              <th scope="col">Date</th>
+              <th scope="col">Attendees</th>
+              <th scope="col">Action items</th>
+              <th scope="col" class="col-actions"><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
             <% @meetings.each do |meeting| %>
-              <tr class="border-t border-slate-200 hover:bg-slate-50">
-                <td class="px-4 py-3 overflow-hidden">
-                  <div class="text-slate-900 font-medium truncate"><%= meeting.title.presence || "Untitled meeting" %></div>
-                  <% if meeting.processing? %>
-                    <div class="text-xs text-amber-600 mt-0.5">Still processing in Fathom</div>
+              <% names = meeting.attendee_names %>
+              <% open_items = meeting.open_action_items.size %>
+              <tr>
+                <td>
+                  <div class="cell-primary">
+                    <span class="tile"><%= icon "video" %></span>
+                    <%= link_to (meeting.title.presence || "Untitled meeting"), meeting_path(meeting) %>
+                    <% if meeting.processing? %><span class="badge" data-tone="warning"><span class="badge-dot"></span>Processing</span><% end %>
+                  </div>
+                </td>
+                <td class="cell-secondary"><%= meeting.recorded_at ? meeting.recorded_at.strftime("%b %-d, %Y") : "—" %></td>
+                <td>
+                  <% if names.any? %>
+                    <div class="attendee-cell">
+                      <span class="avatar-group" role="group" aria-label="<%= names.join(", ") %>">
+                        <% attendee_stack(names).each do |a| %><span class="avatar" data-size="sm" <%= "data-tone=#{a[:tone]}".html_safe if a[:tone] %>><%= a[:text] %></span><% end %>
+                      </span>
+                      <span class="cell-secondary cell-truncate"><%= names.join(", ") %></span>
+                    </div>
+                  <% else %>
+                    <span class="cell-secondary">—</span>
                   <% end %>
                 </td>
-                <td class="px-4 py-3 text-slate-600 whitespace-nowrap"><%= meeting.recorded_at ? meeting.recorded_at.strftime("%b %-d, %Y") : "—" %></td>
-                <td class="px-4 py-3 text-slate-600 truncate"><%= Array(meeting.attendees).map { |a| a.is_a?(Hash) ? (a["name"] || a["email"]) : a }.compact.join(", ").presence || "—" %></td>
-                <td class="px-4 py-3 text-right whitespace-nowrap">
-                  <%= link_to "View →", meeting_path(meeting), class: "text-brand-400 font-semibold hover:text-brand-500" %>
-                </td>
+                <td><span class="badge" <%= 'data-tone="brand"'.html_safe if open_items.positive? %>><%= open_items.zero? ? "None" : "#{open_items} open" %></span></td>
+                <td class="col-actions"><%= link_to "View", meeting_path(meeting), class: "btn btn-secondary", data: { size: "sm" } %></td>
               </tr>
             <% end %>
           </tbody>
         </table>
       </div>
+      <div class="table-footer" role="status">
+        <span class="pagination-summary"><%= number_with_delimiter(@total) %> <%= "meeting".pluralize(@total) %></span>
+        <% if @pages > 1 %>
+          <nav class="pagination" aria-label="Pagination">
+            <span class="pagination-status" aria-hidden="true">Page <%= @page %> of <%= @pages %></span>
+            <div class="pagination-nav">
+              <% base = { q: @query.presence, range: (@range unless @range == "all"), ai: (@only_actions ? "1" : nil), attendees: @selected_people.presence }.compact %>
+              <% if @page > 1 %>
+                <%= link_to meetings_path(base.merge(page: @page - 1)), class: "btn btn-secondary", data: { size: "sm" } do %><%= icon "chevron-left" %>Previous<% end %>
+              <% else %>
+                <button type="button" class="btn btn-secondary" data-size="sm" disabled><%= icon "chevron-left" %>Previous</button>
+              <% end %>
+              <% if @page < @pages %>
+                <%= link_to meetings_path(base.merge(page: @page + 1)), class: "btn btn-secondary", data: { size: "sm" } do %>Next<%= icon "chevron-right" %><% end %>
+              <% else %>
+                <button type="button" class="btn btn-secondary" data-size="sm" disabled>Next<%= icon "chevron-right" %></button>
+              <% end %>
+            </div>
+          </nav>
+        <% end %>
+      </div>
     </div>
-    <% end %>
   <% end %>
-</div>
+<% end %>

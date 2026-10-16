@@ -1,0 +1,56 @@
+<% content_for :title, "Task 360" %>
+<%# UI preview: tasks are not linked across sources yet. Rows below are static sample content. %>
+<% sample = [
+  { title: "Set up billing export",       project: "Proceed Health", status: "In progress", tone: "info",    estimate: "12.0h", logged: "9.5h",  meetings: 2 },
+  { title: "Review onboarding flow",      project: "Proceed Health", status: "Review",      tone: "warning", estimate: "6.0h",  logged: "6.5h",  meetings: 1 },
+  { title: "Migrate reports to new API",  project: "Northwind",      status: "Done",        tone: "success", estimate: "20.0h", logged: "18.0h", meetings: 4 }
+] %>
+
+<header class="page-header">
+  <h1 class="page-title">Task 360</h1>
+</header>
+
+<div class="alert" role="status" data-tone="info">
+  <%= icon "info" %>
+  <div class="alert-content">
+    <div class="alert-title">UI preview</div>
+    <div>Task 360 will combine ClickUp estimates, Hubstaff hours and linked meetings once tasks are linked across sources. The rows below are sample content.</div>
+  </div>
+</div>
+
+<div class="filter-bar" role="search">
+  <div class="input" data-size="sm"><%= icon "search" %><input type="search" placeholder="Search tasks" aria-label="Search tasks" disabled></div>
+  <button type="button" class="chip" aria-pressed="true" data-size="md"><%= icon "check", class: "chip-check" %>All</button>
+  <button type="button" class="chip" aria-pressed="false" data-size="md"><%= icon "check", class: "chip-check" %>Over estimate</button>
+  <button type="button" class="chip" aria-pressed="false" data-size="md"><%= icon "check", class: "chip-check" %>Has meetings</button>
+</div>
+
+<div class="table-card" data-variant="open">
+  <div class="table-scroll" tabindex="0" role="region" aria-label="Tasks (sample)">
+    <table class="table">
+      <caption class="sr-only">Tasks (sample)</caption>
+      <thead>
+        <tr>
+          <th scope="col">Task</th>
+          <th scope="col">Project</th>
+          <th scope="col">Status</th>
+          <th scope="col" class="num">Estimate</th>
+          <th scope="col" class="num">Logged</th>
+          <th scope="col" class="num">Meetings</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% sample.each do |t| %>
+          <tr>
+            <td><div class="cell-primary"><span><%= t[:title] %></span></div></td>
+            <td class="cell-secondary"><%= t[:project] %></td>
+            <td><span class="badge" data-tone="<%= t[:tone] %>"><span class="badge-dot"></span><%= t[:status] %></span></td>
+            <td class="cell-secondary num"><%= t[:estimate] %></td>
+            <td class="cell-secondary num"><%= t[:logged] %></td>
+            <td class="cell-secondary num"><%= t[:meetings] %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>

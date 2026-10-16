@@ -4,5 +4,4 @@ class ProjectMapping < ApplicationRecord
   validates :clickup_space_id, presence: true
   validates :clickup_folder_id, uniqueness: true, allow_blank: true
   validates :clickup_space_id, uniqueness: true, if: -> { clickup_folder_id.blank? }
-  validates :hubstaff_project_id, presence: true
 end

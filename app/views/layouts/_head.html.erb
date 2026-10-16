@@ -3,6 +3,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="application-name" content="Staunch Connect">
 <meta name="mobile-web-app-capable" content="yes">
+<script>try{var t=localStorage.getItem("sc.theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<%# Turbo prefetches a link on hover by default; some pages (the invoice setup modal) call ClickUp, so only load on click. %>
+<meta name="turbo-prefetch" content="false">
 <%= csrf_meta_tags %>
 <%= csp_meta_tag %>
 
@@ -15,10 +18,6 @@
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/icon.png">
 
-<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
-<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css">
-<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
 
-<%# Includes all stylesheet files in app/assets/stylesheets %>
-<%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+<%= stylesheet_link_tag "sc", "app", "data-turbo-track": "reload" %>
 <%= javascript_importmap_tags %>

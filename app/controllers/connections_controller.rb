@@ -1,9 +1,12 @@
 class ConnectionsController < ApplicationController
-  AUTH_ERRORS = [ ClickupClient::AuthenticationError, HubstaffClient::AuthenticationError, FathomClient::AuthenticationError ].freeze
-  REQUEST_ERRORS = [ ClickupClient::RequestError, HubstaffClient::RequestError, FathomClient::RequestError ].freeze
+  AUTH_ERRORS = [ ClickupClient::AuthenticationError, HubstaffClient::AuthenticationError, FathomClient::AuthenticationError, AnthropicConnection::AuthenticationError ].freeze
+  REQUEST_ERRORS = [ ClickupClient::RequestError, HubstaffClient::RequestError, FathomClient::RequestError, AnthropicConnection::RequestError ].freeze
 
+  # Connectors live in the settings modal now; this keeps the old URL (and the
+  # redirects after connect, sync and disconnect) working.
   def index
-    @connections = Connection::SOURCES.index_with { |source| Connection.find_by(source: source) }
+    flash.keep
+    redirect_to settings_path(section: "connectors")
   end
 
   def create
@@ -44,11 +47,12 @@ class ConnectionsController < ApplicationController
 
   def sync
     connection = Connection.find(params[:id])
+    @return_to = local_path(params[:return_to])
 
     if connection.source == "fathom"
       connection.update!(status: :syncing)
       FathomSyncJob.perform_later(connection.id)
-      return redirect_to connections_path, notice: "Fathom sync started in the background — meetings will appear as they're pulled in."
+      return redirect_to after_sync_path, notice: "Fathom sync started in the background — meetings will appear as they're pulled in."
     end
 
     begin
@@ -56,7 +60,7 @@ class ConnectionsController < ApplicationController
       client.verify!
       persist_client_tokens(connection, client)
       connection.update!(status: :connected, last_error: nil, last_used_at: Time.current)
-      redirect_to connections_path, notice: "#{connection.source.capitalize} synced."
+      redirect_to after_sync_path, notice: (connection.source == "anthropic" ? "Anthropic key works." : "#{connection.source.capitalize} synced.")
     rescue *AUTH_ERRORS => e
       mark_error(connection, e.message)
     rescue *REQUEST_ERRORS => e
@@ -74,6 +78,16 @@ class ConnectionsController < ApplicationController
 
   private
 
+  # Sync can be started from the settings modal or from a page like Meetings;
+  # go back to wherever it was started.
+  def after_sync_path
+    @return_to || connections_path
+  end
+
+  def local_path(path)
+    path.to_s.start_with?("/") && !path.to_s.start_with?("//") ? path.to_s : nil
+  end
+
   def client_for(connection, use_cached_access_token: true)
     case connection.source
     when "hubstaff"
@@ -86,6 +100,8 @@ class ConnectionsController < ApplicationController
       ClickupClient.new(connection.credential)
     when "fathom"
       FathomClient.new(connection.credential)
+    when "anthropic"
+      AnthropicConnection.new(connection.credential)
     end
   end
 
@@ -133,6 +149,6 @@ class ConnectionsController < ApplicationController
     connection.status = :error
     connection.last_error = message
     connection.save!
-    redirect_to connections_path, alert: message
+    redirect_to (@return_to || connections_path), alert: message
   end
 end

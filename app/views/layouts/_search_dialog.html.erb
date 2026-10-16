@@ -1,0 +1,26 @@
+<%# SearchDialog (Proposed in the design system). UI shell only: submitting runs the existing Meetings search. %>
+<div class="scrim" data-align="top" data-search-target="scrim" data-action="click->search#backdrop keydown.esc->search#close" hidden>
+  <div class="dialog" data-variant="search" role="dialog" aria-modal="true" aria-label="Search">
+    <%= form_with url: meetings_path, method: :get, class: "search-form" do |form| %>
+      <div class="search-top">
+        <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+        <input class="search-field" type="search" name="q" placeholder="Search meetings, invoices and tasks" aria-label="Search" data-search-target="field">
+        <button type="button" class="icon-btn btn-ghost" data-size="sm" aria-label="Close" data-action="search#close"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+      </div>
+    <% end %>
+    <div class="search-chips">
+      <button type="button" class="chip" aria-pressed="true">All</button>
+      <button type="button" class="chip" aria-pressed="false">Invoices</button>
+      <button type="button" class="chip" aria-pressed="false">Meetings</button>
+      <button type="button" class="chip" aria-pressed="false">Tasks</button>
+    </div>
+    <div class="search-body">
+      <div class="empty" data-size="sm">
+        <div class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg></div>
+        <h3 class="empty-title">Search your workspace</h3>
+        <p class="empty-desc">Press Enter to search meetings by title or attendee. Invoice and task search arrive with their data sources.</p>
+      </div>
+    </div>
+    <div class="search-foot"><span><span class="kbd">Enter</span> to search</span><span><span class="kbd">Esc</span> to close</span></div>
+  </div>
+</div>

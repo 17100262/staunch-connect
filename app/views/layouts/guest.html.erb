@@ -4,7 +4,8 @@
     <%= render "layouts/head" %>
   </head>
 
-  <body class="h-screen w-screen m-0 bg-slate-50 font-sans antialiased flex items-center justify-center">
+  <body class="guest">
+    <%= render "shared/icons" %>
     <%= yield %>
   </body>
 </html>

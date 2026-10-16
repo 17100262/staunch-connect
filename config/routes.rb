@@ -1,11 +1,16 @@
 Rails.application.routes.draw do
   resource :session
   resources :passwords, param: :token
+  get "settings", to: "settings#show", as: :settings
+  patch "settings/profile", to: "settings#update_profile", as: :settings_profile
+  patch "settings/password", to: "settings#update_password", as: :settings_password
   resources :connections, only: %i[index create destroy] do
     member { post :sync }
   end
 
   resources :meetings, only: %i[index show]
+  resources :notifications, only: :index
+  get "task-360", to: "tasks#index", as: :task_360
 
   namespace :webhooks do
     post "fathom", to: "fathom#create"
@@ -18,7 +23,7 @@ Rails.application.routes.draw do
   end
   resources :project_mappings, only: %i[create destroy]
 
-  resources :ai_conversations, only: %i[index show create destroy] do
+  resources :ai_conversations, only: %i[index show create update destroy] do
     resources :messages, only: %i[create], controller: "ai_messages"
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
