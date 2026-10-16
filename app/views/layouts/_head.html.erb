@@ -4,6 +4,8 @@
 <meta name="application-name" content="Staunch Connect">
 <meta name="mobile-web-app-capable" content="yes">
 <script>try{var t=localStorage.getItem("sc.theme");if(t==="dark"||t==="light")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<%# Turbo prefetches a link on hover by default; some pages (the invoice setup modal) call ClickUp, so only load on click. %>
+<meta name="turbo-prefetch" content="false">
 <%= csrf_meta_tags %>
 <%= csp_meta_tag %>
 
