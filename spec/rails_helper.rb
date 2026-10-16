@@ -1,7 +1,7 @@
 require "simplecov"
 SimpleCov.start "rails" do
   enable_coverage :branch
-  add_group "Services", "app/services"
+  group "Services", "app/services"
 end
 
 require "spec_helper"
