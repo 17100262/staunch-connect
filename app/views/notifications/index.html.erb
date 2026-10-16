@@ -1,0 +1,42 @@
+<% content_for :title, "Notifications" %>
+<%# UI preview: no notifications data source exists yet. Rows below are static sample content. %>
+<% sample = [
+  { icon: "video",        tone: "primary", title: "New meeting summary ready",     desc: "Weekly sync with the design team was processed in Fathom.", time: "2 hours ago", unread: true },
+  { icon: "file",         tone: nil,       title: "Invoice draft needs a rate",    desc: "A project mapping has no hourly rate, so amounts show as $0.00.", time: "Yesterday", unread: true },
+  { icon: "square-check", tone: nil,       title: "Action item assigned to you",   desc: "Follow up on the budget questions raised in the client call.", time: "2 days ago", unread: false }
+] %>
+
+<header class="page-header">
+  <h1 class="page-title">Notifications</h1>
+  <div class="page-actions">
+    <button type="button" class="btn btn-secondary" disabled><%= icon "check" %>Mark all as read</button>
+  </div>
+</header>
+
+<div class="alert" role="status" data-tone="info">
+  <%= icon "info" %>
+  <div class="alert-content">
+    <div class="alert-title">UI preview</div>
+    <div>Notifications aren't connected to real events yet. The items below are sample content.</div>
+  </div>
+</div>
+
+<div class="tabs" role="tablist">
+  <button type="button" role="tab" class="tab" aria-selected="true">All</button>
+  <button type="button" role="tab" class="tab" aria-selected="false">Unread<span class="badge" data-tone="brand">2</span></button>
+  <button type="button" role="tab" class="tab" aria-selected="false">Action items</button>
+</div>
+
+<div class="notif-list">
+  <% sample.each do |n| %>
+    <div class="notif-row">
+      <span class="tile" <%= "data-tone=#{n[:tone]}".html_safe if n[:tone] %>><%= icon n[:icon] %></span>
+      <div class="notif-main">
+        <span class="label-base"><%= n[:title] %></span>
+        <span class="body-sm"><%= n[:desc] %></span>
+      </div>
+      <% if n[:unread] %><span class="dot" data-tone="brand" role="img" aria-label="Unread"></span><% end %>
+      <span class="notif-time caption"><%= n[:time] %></span>
+    </div>
+  <% end %>
+</div>

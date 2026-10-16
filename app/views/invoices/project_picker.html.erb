@@ -1,33 +1,31 @@
 <% content_for :title, "Invoicing" %>
-<% content_for :subtitle do %>Select a client and billing period to build a reconciliation<% end %>
 
-<div class="h-full flex items-center justify-center p-8">
-  <div class="w-full max-w-[480px] bg-white border border-slate-200 rounded-2xl shadow-sm p-7">
-    <% if alert = flash[:alert] %>
-      <p class="py-2 px-3 bg-red-50 text-red-500 font-medium rounded-lg mb-4"><%= alert %></p>
-    <% end %>
+<nav class="breadcrumb" aria-label="Breadcrumb"><ol>
+  <li><%= link_to "Invoicing", invoices_path %><span class="breadcrumb-sep" aria-hidden="true"><%= icon "chevron-right" %></span></li>
+  <li><span aria-current="page">New invoice</span></li>
+</ol></nav>
 
-    <div class="flex items-start gap-3 mb-5">
-      <span class="flex-none w-10 h-10 rounded-xl bg-brand-50 text-brand-400 flex items-center justify-center">
-        <i class="ph ph-file-text text-xl"></i>
-      </span>
-      <div class="min-w-0">
-        <div class="font-bold text-base text-slate-900">New Invoice</div>
-        <div class="mt-0.5 text-sm text-slate-600 leading-relaxed">Pick the ClickUp project to build a reconciliation for.</div>
-      </div>
-    </div>
+<header class="page-header">
+  <div>
+    <h1 class="page-title">New invoice</h1>
+    <p class="page-desc">Pick the ClickUp project to build a reconciliation for.</p>
+  </div>
+</header>
 
-    <% if @spaces.empty? %>
-      <p class="text-sm text-slate-500">No ClickUp projects found for this workspace.</p>
-    <% else %>
-      <div class="flex flex-col gap-2">
-        <% @spaces.each do |space| %>
-          <%= link_to invoicing_path(clickup_space_id: space["id"], clickup_space_name: space["name"]), class: "flex items-center justify-between gap-2 px-4 py-3 rounded-lg border border-slate-200 hover:border-brand-400 hover:bg-brand-25 text-sm font-semibold text-slate-900" do %>
-            <%= space["name"] %>
-            <i class="ph ph-arrow-right text-base text-slate-400"></i>
-          <% end %>
-        <% end %>
-      </div>
+<%= tag.div flash_alerts, class: "flash-stack" if flash.any? %>
+
+<% if @spaces.empty? %>
+  <div class="empty" data-size="sm">
+    <div class="empty-icon"><%= icon "folder" %></div>
+    <h3 class="empty-title">No ClickUp projects found</h3>
+    <p class="empty-desc">No projects were found for this workspace.</p>
+  </div>
+<% else %>
+  <div class="pick-list narrow">
+    <% @spaces.each do |space| %>
+      <%= link_to invoicing_path(clickup_space_id: space["id"], clickup_space_name: space["name"]), class: "card", data: { padding: "sm" } do %>
+        <span class="pick-row"><span class="label-base"><%= space["name"] %></span><%= icon "arrow-right" %></span>
+      <% end %>
     <% end %>
   </div>
-</div>
+<% end %>

@@ -1,25 +1,25 @@
 <% content_for :title, "Home" %>
-<% content_for :subtitle do %>Welcome back, <%= Current.user.email_address %><% end %>
 
-<div class="h-full flex items-center justify-center p-8">
-  <div class="w-full max-w-[520px] bg-white border border-slate-200 rounded-2xl shadow-sm p-7">
-    <div class="flex items-start gap-3">
-      <span class="flex-none w-10 h-10 rounded-xl bg-brand-50 text-brand-400 flex items-center justify-center">
-        <i class="ph ph-plugs-connected text-xl"></i>
-      </span>
-      <div class="min-w-0">
-        <div class="font-bold text-base text-slate-900">Connect your first data source</div>
-        <div class="mt-0.5 text-sm text-slate-600 leading-relaxed">
-          Link Hubstaff and ClickUp to start building your consolidated task view. Other sources unlock as they come online.
-        </div>
-      </div>
-    </div>
+<header class="page-header">
+  <h1 class="page-title">Home</h1>
+</header>
 
-    <div class="mt-6">
-      <%= link_to connections_path, class: "inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-brand-400 hover:bg-brand-500 text-white font-semibold text-sm" do %>
-        <i class="ph ph-gear-six text-lg"></i>
-        Go to Connector Settings
-      <% end %>
+<%= tag.div flash_alerts, class: "flash-stack" if flash.any? %>
+
+<section class="banner" aria-labelledby="home-banner">
+  <div class="banner-body">
+    <h2 class="banner-title" id="home-banner">Connect your first data source</h2>
+    <p class="banner-desc">Link Hubstaff and ClickUp to start building your consolidated task view. Other sources unlock as they come online.</p>
+    <div class="banner-actions">
+      <%= link_to connections_path, class: "btn btn-primary" do %><%= icon "plus" %>Connect sources<% end %>
     </div>
   </div>
-</div>
+  <div class="banner-aside">
+    <span class="avatar-group">
+      <span class="avatar" data-size="lg" data-tone="info">HS</span>
+      <span class="avatar" data-size="lg" data-tone="brand">CU</span>
+      <span class="avatar" data-size="lg" data-tone="success">FA</span>
+    </span>
+    <span class="caption">Hubstaff, ClickUp, Fathom</span>
+  </div>
+</section>

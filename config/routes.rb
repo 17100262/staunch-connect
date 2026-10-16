@@ -6,6 +6,8 @@ Rails.application.routes.draw do
   end
 
   resources :meetings, only: %i[index show]
+  resources :notifications, only: :index
+  get "task-360", to: "tasks#index", as: :task_360
 
   namespace :webhooks do
     post "fathom", to: "fathom#create"

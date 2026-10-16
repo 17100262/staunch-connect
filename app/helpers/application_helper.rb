@@ -20,29 +20,26 @@ module ApplicationHelper
     )
   end
 
-  def sidebar_link(label, path, icon:, active: false)
-    classes = [ "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors" ]
-    classes << (active ? "bg-brand-50 text-brand-400 font-semibold" : "text-slate-600 font-medium hover:bg-slate-100")
-
-    link_to path, class: classes.join(" ") do
-      safe_join([
-        tag.i(class: "#{active ? "ph-fill" : "ph"} ph-#{icon} text-lg"),
-        tag.span(label, class: "flex-1")
-      ])
-    end
+  # Inline SVG icon from the SC sprite (layouts render shared/_icons once).
+  def icon(name, **attrs)
+    css = [ "icon", attrs.delete(:class) ].compact.join(" ")
+    tag.svg(tag.use(href: "#i-#{name}"), class: css, aria: { hidden: true }, **attrs)
   end
 
-  def sidebar_soon(label, icon:)
-    content_tag :div, class: "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-400 font-medium cursor-not-allowed" do
-      safe_join([
-        tag.i(class: "ph ph-#{icon} text-lg"),
-        tag.span(label, class: "flex-1"),
-        tag.span("Soon", class: "text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500")
-      ])
-    end
+  # Flash messages as SC alerts.
+  def flash_alerts
+    tones = { "notice" => [ "success", "circle-check" ], "alert" => [ "danger", "circle-alert" ] }
+    safe_join(flash.filter_map do |type, message|
+      tone, icon_name = tones[type.to_s]
+      next unless tone
+
+      tag.div(class: "alert", role: "alert", data: { tone: tone }, id: type.to_s) do
+        icon(icon_name) + tag.div(message, class: "alert-content")
+      end
+    end)
   end
 
-  def sidebar_section(label)
-    tag.div(label, class: "px-3 pt-3.5 pb-1.5 text-[11px] font-semibold tracking-wider uppercase text-slate-400")
+  def attendee_names(meeting)
+    Array(meeting.attendees).map { |a| a.is_a?(Hash) ? (a["name"].presence || a["email"]) : a }.compact
   end
 end

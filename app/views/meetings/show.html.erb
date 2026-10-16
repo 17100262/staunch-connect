@@ -1,60 +1,55 @@
 <% content_for :title, @meeting.title.presence || "Untitled meeting" %>
-<% content_for :subtitle do %>
-  <%= @meeting.recorded_at ? @meeting.recorded_at.strftime("%B %-d, %Y") : "Date unknown" %>
-  <% if @meeting.duration_minutes.present? %> &middot; <%= @meeting.duration_minutes %> min<% end %>
+
+<nav class="breadcrumb" aria-label="Breadcrumb"><ol>
+  <li><%= link_to "Meetings", meetings_path %><span class="breadcrumb-sep" aria-hidden="true"><%= icon "chevron-right" %></span></li>
+  <li><span aria-current="page"><%= @meeting.title.presence || "Untitled meeting" %></span></li>
+</ol></nav>
+
+<header class="page-header">
+  <div>
+    <h1 class="page-title"><%= @meeting.title.presence || "Untitled meeting" %></h1>
+    <p class="page-desc">
+      <%= @meeting.recorded_at ? @meeting.recorded_at.strftime("%B %-d, %Y") : "Date unknown" %>
+      <% if @meeting.duration_minutes.present? %> · <%= @meeting.duration_minutes %> min<% end %>
+    </p>
+  </div>
+  <div class="page-actions">
+    <% if @meeting.fathom_url.present? %>
+      <%= link_to @meeting.fathom_url, target: "_blank", rel: "noopener", class: "btn btn-secondary" do %><%= icon "video" %>View in Fathom<% end %>
+    <% else %>
+      <span class="caption">Fathom link unavailable</span>
+    <% end %>
+  </div>
+</header>
+
+<% if attendee_names(@meeting).any? %>
+  <div class="card">
+    <div class="card-body">
+      <dl class="kv">
+        <dt>Attendees</dt><dd><%= attendee_names(@meeting).join(", ") %></dd>
+      </dl>
+    </div>
+  </div>
 <% end %>
 
-<div class="p-8 flex flex-col gap-6 max-w-3xl">
-  <div class="flex items-center justify-between gap-3 flex-wrap">
-    <%= link_to meetings_path, class: "inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-slate-900" do %>
-      <i class="ph ph-arrow-left"></i> All meetings
-    <% end %>
-
-    <% if @meeting.fathom_url.present? %>
-      <%= link_to @meeting.fathom_url, target: "_blank", rel: "noopener", class: "inline-flex items-center gap-2 h-9 px-3 rounded-lg bg-white border border-slate-200 text-slate-900 hover:bg-slate-50 text-sm font-semibold" do %>
-        <i class="ph ph-video-camera text-lg"></i> View in Fathom
-      <% end %>
-    <% end %>
-  </div>
-
-  <% if Array(@meeting.attendees).any? %>
-    <div class="text-sm text-slate-600">
-      <span class="font-semibold text-slate-900">Attendees:</span>
-      <%= Array(@meeting.attendees).map { |a| a.is_a?(Hash) ? (a["name"] || a["email"]) : a }.compact.join(", ") %>
-    </div>
-  <% end %>
-
-  <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-    <div class="font-bold text-sm text-slate-900 mb-2">Summary</div>
+<div class="card">
+  <div class="card-header"><h2 class="card-title">Summary</h2></div>
+  <div class="card-body">
     <% if @meeting.summary.present? %>
-      <div class="text-sm text-slate-700
-        [&_h1]:text-base [&_h1]:font-bold [&_h1]:text-slate-900 [&_h1]:mt-4 [&_h1]:mb-1 [&_h1:first-child]:mt-0
-        [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-slate-900 [&_h2]:mt-4 [&_h2]:mb-1 [&_h2:first-child]:mt-0
-        [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:text-slate-800 [&_h3]:mt-3 [&_h3]:mb-1
-        [&_p]:mb-3 [&_p]:leading-relaxed
-        [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_ul]:mb-3
-        [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1 [&_ol]:mb-3
-        [&_li]:leading-relaxed
-        [&_strong]:font-semibold [&_strong]:text-slate-900
-        [&_a]:text-brand-400 [&_a:hover]:underline
-        [&_blockquote]:border-l-2 [&_blockquote]:border-slate-200 [&_blockquote]:pl-3 [&_blockquote]:text-slate-500 [&_blockquote]:italic
-        [&_code]:bg-slate-100 [&_code]:rounded [&_code]:px-1 [&_code]:text-[13px]
-      "><%= markdown_to_html(@meeting.summary) %></div>
+      <div class="prose"><%= markdown_to_html(@meeting.summary) %></div>
     <% else %>
-      <div class="text-sm text-slate-400 italic">
-        <%= @meeting.processing? ? "Still processing in Fathom — check back soon." : "No summary generated." %>
-      </div>
+      <p class="caption"><%= @meeting.processing? ? "Still processing in Fathom. Check back soon." : "No summary generated." %></p>
     <% end %>
   </div>
+</div>
 
-  <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
-    <div class="font-bold text-sm text-slate-900 mb-2">Transcript</div>
+<div class="card">
+  <div class="card-header"><h2 class="card-title">Transcript</h2></div>
+  <div class="card-body">
     <% if @meeting.transcript.present? %>
-      <div class="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap max-h-[600px] overflow-y-auto"><%= @meeting.transcript %></div>
+      <div class="transcript body-base"><%= @meeting.transcript %></div>
     <% else %>
-      <div class="text-sm text-slate-400 italic">
-        <%= @meeting.processing? ? "Still processing in Fathom — check back soon." : "No transcript available." %>
-      </div>
+      <p class="caption"><%= @meeting.processing? ? "Still processing in Fathom. Check back soon." : "No transcript available." %></p>
     <% end %>
   </div>
 </div>

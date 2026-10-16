@@ -1,17 +1,17 @@
 <% content_for :title, @conversation.title.presence || "AI Assistant" %>
-<% content_for :subtitle do %>Ask questions about your invoicing data<% end %>
 
-<div class="p-8 flex flex-col gap-6 max-w-3xl mx-auto min-h-full" data-controller="chat">
-  <div class="flex items-center justify-between">
-    <%= link_to ai_conversations_path, class: "inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700" do %>
-      <i class="ph ph-arrow-left"></i> All conversations
-    <% end %>
-  </div>
+<nav class="breadcrumb" aria-label="Breadcrumb"><ol>
+  <li><%= link_to "AI Assistant", ai_conversations_path %><span class="breadcrumb-sep" aria-hidden="true"><%= icon "chevron-right" %></span></li>
+  <li><span aria-current="page"><%= @conversation.title.presence || "New conversation" %></span></li>
+</ol></nav>
 
-  <div id="messages" data-chat-target="messages" class="flex-1 flex flex-col gap-4">
+<div class="chat-page" data-controller="chat">
+  <div id="messages" class="chat-thread" role="log" aria-live="polite" data-chat-target="messages">
     <% if @conversation.ai_messages.empty? %>
-      <div id="empty_hint" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 text-sm text-slate-600">
-        Ask something like <span class="font-medium text-slate-900">"What was the total amount for the invoice in August?"</span> or <span class="font-medium text-slate-900">"What was the highest task in terms of hours?"</span>
+      <div id="empty_hint" class="empty" data-size="sm">
+        <div class="empty-icon"><%= icon "sparkles" %></div>
+        <h3 class="empty-title">Ask about your invoices and meetings</h3>
+        <p class="empty-desc">Try "What was the total for the August invoice?" or "What are my open action items this week?"</p>
       </div>
     <% end %>
 
@@ -20,5 +20,7 @@
     <div id="chat_bottom" data-chat-target="bottom"></div>
   </div>
 
-  <%= render "message_form", conversation: @conversation %>
+  <div class="chat-composer">
+    <%= render "message_form", conversation: @conversation %>
+  </div>
 </div>

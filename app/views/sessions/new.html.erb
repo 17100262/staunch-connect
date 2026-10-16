@@ -1,44 +1,35 @@
-<div class="w-[400px]">
-  <% if alert = flash[:alert] %>
-    <p class="py-2 px-3 bg-red-50 mb-5 text-red-500 font-medium rounded-lg" id="alert"><%= alert %></p>
-  <% end %>
+<% content_for :title, "Sign in" %>
 
-  <% if notice = flash[:notice] %>
-    <p class="py-2 px-3 bg-green-50 mb-5 text-green-500 font-medium rounded-lg" id="notice"><%= notice %></p>
-  <% end %>
-
-  <div class="bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
-    <div class="flex flex-col items-center gap-1.5 mb-7">
-      <span class="w-11 h-11 rounded-xl bg-brand-400 text-white flex items-center justify-center font-display font-extrabold text-xl">S</span>
-      <div class="font-display font-extrabold text-[22px] text-slate-900 mt-2">Staunch Connect</div>
-      <div class="text-sm text-slate-600 text-center">Sign in to your workspace</div>
-    </div>
-
-    <%= form_with url: session_url, class: "flex flex-col gap-4" do |form| %>
-      <div>
-        <label class="block text-sm font-medium text-slate-900 mb-1.5" for="email_address">Work Email</label>
-        <div class="flex items-center gap-2 h-11 px-3.5 bg-slate-50 border border-slate-200 rounded-xl focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-400/20">
-          <i class="ph ph-envelope-simple text-lg text-slate-400"></i>
-          <%= form.email_field :email_address, id: "email_address", required: true, autofocus: true, autocomplete: "username", placeholder: "you@staunch.co", value: params[:email_address], class: "flex-1 min-w-0 border-0 outline-none bg-transparent text-[15px] text-slate-900 placeholder:text-slate-400" %>
-        </div>
-      </div>
-
-      <div>
-        <div class="flex items-center justify-between mb-1.5">
-          <label class="block text-sm font-medium text-slate-900" for="password">Password</label>
-          <%= link_to "Forgot Password?", new_password_path, class: "text-xs font-medium text-brand-400 hover:text-brand-500" %>
-        </div>
-        <div class="flex items-center gap-2 h-11 px-3.5 bg-slate-50 border border-slate-200 rounded-xl focus-within:border-brand-400 focus-within:ring-2 focus-within:ring-brand-400/20">
-          <i class="ph ph-lock-key text-lg text-slate-400"></i>
-          <%= form.password_field :password, id: "password", required: true, autocomplete: "current-password", placeholder: "••••••••••", maxlength: 72, class: "flex-1 min-w-0 border-0 outline-none bg-transparent text-[15px] text-slate-900 placeholder:text-slate-400" %>
-        </div>
-      </div>
-
-      <%= form.submit "Sign In", class: "w-full h-11 rounded-lg bg-brand-400 hover:bg-brand-500 text-white font-semibold text-sm cursor-pointer mt-1" %>
-    <% end %>
-
-    <div class="mt-5 text-center text-[13px] text-slate-400">
-      Invite-only workspace &middot; contact your admin for access
-    </div>
+<div class="auth-card">
+  <div class="auth-head">
+    <span class="avatar" data-tone="brand">SC</span>
+    <h1 class="page-title">Staunch Connect</h1>
+    <p class="page-desc">Sign in to your workspace</p>
   </div>
+
+  <%= tag.div flash_alerts, class: "flash-stack" if flash.any? %>
+
+  <%= form_with url: session_url, class: "form-stack" do |form| %>
+    <div class="field">
+      <label class="field-label" for="email_address">Work email</label>
+      <div class="input" data-size="lg">
+        <%= icon "mail" %>
+        <%= form.email_field :email_address, id: "email_address", required: true, autofocus: true, autocomplete: "username", placeholder: "you@staunch.co", value: params[:email_address] %>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="field-row">
+        <label class="field-label" for="password">Password</label>
+        <%= link_to "Forgot password?", new_password_path, class: "label-sm" %>
+      </div>
+      <div class="input" data-size="lg">
+        <%= form.password_field :password, id: "password", required: true, autocomplete: "current-password", placeholder: "••••••••••", maxlength: 72 %>
+      </div>
+    </div>
+
+    <%= form.button "Sign in", type: :submit, class: "btn btn-primary btn-block", data: { size: "lg" } %>
+  <% end %>
+
+  <p class="auth-foot caption">Invite-only workspace. Contact your admin for access.</p>
 </div>

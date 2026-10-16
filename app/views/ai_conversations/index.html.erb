@@ -1,52 +1,44 @@
 <% content_for :title, "AI Assistant" %>
-<% content_for :subtitle do %>Ask questions about your invoicing data<% end %>
 
-<div class="p-8 flex flex-col gap-6">
-  <% if notice = flash[:notice] %>
-    <p class="py-2 px-3 bg-green-50 text-green-500 font-medium rounded-lg inline-block"><%= notice %></p>
-  <% end %>
+<header class="page-header">
+  <h1 class="page-title">AI Assistant</h1>
+  <div class="page-actions">
+    <%= button_to ai_conversations_path, class: "btn btn-primary" do %><%= icon "plus" %>New conversation<% end %>
+  </div>
+</header>
 
-  <% if @conversations.empty? %>
-    <div class="h-full flex items-center justify-center p-8">
-      <div class="w-full max-w-[480px] bg-white border border-slate-200 rounded-2xl shadow-sm p-7">
-        <div class="flex items-start gap-3">
-          <span class="flex-none w-10 h-10 rounded-xl bg-brand-50 text-brand-400 flex items-center justify-center">
-            <i class="ph ph-sparkle text-xl"></i>
-          </span>
-          <div class="min-w-0">
-            <div class="font-bold text-base text-slate-900">Ask about your invoices</div>
-            <div class="mt-0.5 text-sm text-slate-600 leading-relaxed">
-              e.g. "What was the total amount for the invoice in August?" or "What was the highest task in terms of hours?"
-            </div>
-          </div>
-        </div>
+<%= tag.div flash_alerts, class: "flash-stack" if flash.any? %>
 
-        <div class="mt-6">
-          <%= button_to "New Conversation", ai_conversations_path, class: "inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-brand-400 hover:bg-brand-500 text-white font-semibold text-sm cursor-pointer" %>
-        </div>
-      </div>
+<% if @conversations.empty? %>
+  <div class="empty" data-variant="bordered">
+    <div class="empty-icon"><%= icon "sparkles" %></div>
+    <h3 class="empty-title">Ask about your invoices and meetings</h3>
+    <p class="empty-desc">Try "What was the total for the August invoice?" or "Which meeting discussed the AWS migration?"</p>
+  </div>
+<% else %>
+  <div class="table-card" data-variant="open">
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Conversations">
+      <table class="table">
+        <caption class="sr-only">Conversations</caption>
+        <thead>
+          <tr>
+            <th scope="col">Conversation</th>
+            <th scope="col">Last activity</th>
+            <th scope="col" class="col-actions"><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @conversations.each do |conversation| %>
+            <tr>
+              <td><div class="cell-primary"><%= link_to (conversation.title.presence || "New conversation"), ai_conversation_path(conversation) %></div></td>
+              <td class="cell-secondary"><%= conversation.updated_at.strftime("%-d %b %Y, %-I:%M %p") %></td>
+              <td class="col-actions">
+                <%= button_to ai_conversation_path(conversation), method: :delete, class: "icon-btn btn-ghost", data: { size: "sm" }, aria: { label: "Delete conversation" }, form: { data: { turbo_confirm: "Delete this conversation? This can't be undone." } } do %><%= icon "trash" %><% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
     </div>
-  <% else %>
-    <div class="flex items-center justify-end">
-      <%= button_to "New Conversation", ai_conversations_path, class: "inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-brand-400 hover:bg-brand-500 text-white font-semibold text-sm cursor-pointer" %>
-    </div>
-
-    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-      <div class="grid grid-cols-[1fr_180px_60px] gap-3 px-4 py-3 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
-        <div>Conversation</div>
-        <div>Last activity</div>
-        <div></div>
-      </div>
-
-      <% @conversations.each do |conversation| %>
-        <div class="grid grid-cols-[1fr_180px_60px] gap-3 px-4 py-3 border-t border-slate-200 text-sm items-center">
-          <%= link_to conversation.title.presence || "New conversation", ai_conversation_path(conversation), class: "text-slate-900 font-medium truncate hover:text-brand-400" %>
-          <div class="text-slate-600"><%= conversation.updated_at.strftime("%b %-d, %Y %-I:%M%P") %></div>
-          <div class="flex items-center justify-end">
-            <%= button_to "Delete", ai_conversation_path(conversation), method: :delete, class: "text-sm font-semibold text-red-600 hover:text-red-700 bg-transparent border-0 cursor-pointer p-0", form: { data: { turbo_confirm: "Delete this conversation? This can't be undone." } } %>
-          </div>
-        </div>
-      <% end %>
-    </div>
-  <% end %>
-</div>
+  </div>
+<% end %>

@@ -1,66 +1,50 @@
 <% content_for :title, "Invoicing" %>
-<% content_for :subtitle do %>All invoices across your connected projects<% end %>
 
-<div class="p-8 flex flex-col gap-6">
-  <% if notice = flash[:notice] %>
-    <p class="py-2 px-3 bg-green-50 text-green-500 font-medium rounded-lg inline-block"><%= notice %></p>
-  <% end %>
-  <% if alert = flash[:alert] %>
-    <p class="py-2 px-3 bg-red-50 text-red-500 font-medium rounded-lg inline-block"><%= alert %></p>
-  <% end %>
+<header class="page-header">
+  <h1 class="page-title">Invoicing</h1>
+  <div class="page-actions">
+    <%= link_to invoicing_path, class: "btn btn-primary" do %><%= icon "plus" %>Create invoice<% end %>
+  </div>
+</header>
 
-  <% if @invoices.empty? %>
-    <div class="h-full flex items-center justify-center p-8">
-      <div class="w-full max-w-[480px] bg-white border border-slate-200 rounded-2xl shadow-sm p-7">
-        <div class="flex items-start gap-3">
-          <span class="flex-none w-10 h-10 rounded-xl bg-brand-50 text-brand-400 flex items-center justify-center">
-            <i class="ph ph-file-text text-xl"></i>
-          </span>
-          <div class="min-w-0">
-            <div class="font-bold text-base text-slate-900">No invoices yet</div>
-            <div class="mt-0.5 text-sm text-slate-600 leading-relaxed">
-              Build a reconciliation from a ClickUp project's tasks and Hubstaff's logged hours, then save it as an invoice.
-            </div>
-          </div>
-        </div>
+<%= tag.div flash_alerts, class: "flash-stack" if flash.any? %>
 
-        <div class="mt-6">
-          <%= link_to invoicing_path, class: "inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-brand-400 hover:bg-brand-500 text-white font-semibold text-sm" do %>
-            <i class="ph ph-plus text-lg"></i>
-            Create Invoice
+<% if @invoices.empty? %>
+  <div class="empty" data-variant="bordered">
+    <div class="empty-icon"><%= icon "file" %></div>
+    <h3 class="empty-title">No invoices yet</h3>
+    <p class="empty-desc">Build a reconciliation from a ClickUp project's tasks and Hubstaff's logged hours, then save it as an invoice.</p>
+    <div class="empty-actions"><%= link_to invoicing_path, class: "btn btn-primary" do %><%= icon "plus" %>Create invoice<% end %></div>
+  </div>
+<% else %>
+  <div class="table-card" data-variant="open">
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Invoices">
+      <table class="table">
+        <caption class="sr-only">Invoices</caption>
+        <thead>
+          <tr>
+            <th scope="col">Invoice</th>
+            <th scope="col">Billing period</th>
+            <th scope="col" class="num">Hours</th>
+            <th scope="col" class="num">Billed</th>
+            <th scope="col" class="col-actions"><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @invoices.each do |invoice| %>
+            <tr>
+              <td><div class="cell-primary"><%= link_to invoice.name, invoice_path(invoice) %></div></td>
+              <td class="cell-secondary"><%= Date.strptime(invoice.month, "%Y-%m").strftime("%B %Y") %></td>
+              <td class="cell-secondary num"><%= number_with_precision(invoice.total_estimate_hours, precision: 1) %>h</td>
+              <td class="num"><%= number_to_currency(invoice.total_amount) %></td>
+              <td class="col-actions">
+                <%= link_to "View", invoice_path(invoice), class: "btn btn-ghost", data: { size: "sm" } %>
+                <%= button_to invoice_path(invoice), method: :delete, class: "icon-btn btn-ghost", data: { size: "sm" }, aria: { label: "Delete #{invoice.name}" }, form: { class: "inline-form", data: { turbo_confirm: "Delete this invoice? This can't be undone." } } do %><%= icon "trash" %><% end %>
+              </td>
+            </tr>
           <% end %>
-        </div>
-      </div>
+        </tbody>
+      </table>
     </div>
-  <% else %>
-    <div class="flex items-center justify-end">
-      <%= link_to invoicing_path, class: "inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-brand-400 hover:bg-brand-500 text-white font-semibold text-sm" do %>
-        <i class="ph ph-plus text-lg"></i>
-        Create Invoice
-      <% end %>
-    </div>
-
-    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-      <div class="grid grid-cols-[1fr_160px_120px_140px_140px] gap-3 px-4 py-3 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
-        <div>Invoice</div>
-        <div>Billing Period</div>
-        <div>Hours</div>
-        <div>Billed</div>
-        <div></div>
-      </div>
-
-      <% @invoices.each do |invoice| %>
-        <div class="grid grid-cols-[1fr_160px_120px_140px_140px] gap-3 px-4 py-3 border-t border-slate-200 text-sm items-center">
-          <div class="text-slate-900 font-medium truncate"><%= invoice.name %></div>
-          <div class="text-slate-600"><%= Date.strptime(invoice.month, "%Y-%m").strftime("%B %Y") %></div>
-          <div class="text-slate-900"><%= number_with_precision(invoice.total_estimate_hours, precision: 1) %>h</div>
-          <div class="text-slate-900 font-medium"><%= number_to_currency(invoice.total_amount) %></div>
-          <div class="flex items-center justify-end gap-3">
-            <%= link_to "View", invoice_path(invoice), class: "text-sm font-semibold text-brand-400 hover:text-brand-500" %>
-            <%= button_to "Delete", invoice_path(invoice), method: :delete, class: "text-sm font-semibold text-red-600 hover:text-red-700 bg-transparent border-0 cursor-pointer p-0", form: { data: { turbo_confirm: "Delete this invoice? This can't be undone." } } %>
-          </div>
-        </div>
-      <% end %>
-    </div>
-  <% end %>
-</div>
+  </div>
+<% end %>
