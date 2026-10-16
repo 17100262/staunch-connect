@@ -40,6 +40,12 @@ class Meeting < ApplicationRecord
     Array(attendees).filter_map { |a| a.is_a?(Hash) ? (a["name"].presence || a["email"].presence) : a.presence }
   end
 
+  # The Fathom link, only when it is an http(s) URL — it comes from Fathom's payload,
+  # so anything else (e.g. a javascript: URL) is never rendered as a link.
+  def fathom_link
+    fathom_url if fathom_url.to_s.match?(%r{\Ahttps?://}i)
+  end
+
   def processing?
     summary.blank? && transcript.blank?
   end
