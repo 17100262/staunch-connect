@@ -8,7 +8,7 @@
   cmp_text = pct > 100 ? "#{pct - 100}% over" : (pct < 100 ? "#{100 - pct}% under" : "On estimate")
   cmp_tone = pct > 120 ? "danger" : (pct > 100 ? "warning" : "success")
   diff_note = diff.to_f > 0 ? "Hubstaff has more hours than ClickUp" : (diff.to_f < 0 ? "Hubstaff has fewer hours than ClickUp" : "Hubstaff matches ClickUp")
-  setup_for_edit = @setup.merge("step" => 3, "mode" => "review", "month" => @month, "rate" => @rate.to_s, "hubstaff_project_value" => (compared ? "#{@hub_id}|#{@hub_name}" : "none"))
+  setup_for_edit = @setup.merge("step" => 3, "mode" => "review", "month" => @month, "rate" => number_with_precision(@rate, precision: 2), "hubstaff_project_value" => (compared ? "#{@hub_id}|#{@hub_name}" : "none"))
 %>
 
 <header class="page-header">
@@ -125,7 +125,7 @@
     <%= form_with url: invoices_path, method: :post do |form| %>
       <%= render "invoices/setup/carry", except: %w[month rate hubstaff_project_value step mode] %>
       <%= hidden_field_tag :month, @month, id: nil %>
-      <%= hidden_field_tag :rate, @rate.to_s, id: nil %>
+      <%= hidden_field_tag :rate, number_with_precision(@rate, precision: 2), id: nil %>
       <%= hidden_field_tag :hubstaff_project_value, (compared ? "#{@hub_id}|#{@hub_name}" : "none"), id: nil %>
       <%= form.button "Save as invoice", type: :submit, class: "btn btn-primary" %>
     <% end %>
