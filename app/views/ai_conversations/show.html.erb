@@ -1,26 +1,40 @@
 <% content_for :title, @conversation.title.presence || "AI Assistant" %>
+<% content_for :full_bleed, true %>
 
-<nav class="breadcrumb" aria-label="Breadcrumb"><ol>
-  <li><%= link_to "AI Assistant", ai_conversations_path %><span class="breadcrumb-sep" aria-hidden="true"><%= icon "chevron-right" %></span></li>
-  <li><span aria-current="page"><%= @conversation.title.presence || "New conversation" %></span></li>
-</ol></nav>
+<div class="cx" data-controller="chatlist dialogs">
+  <%= render "chat_list", conversations: @conversations, current: @conversation, query: @query %>
 
-<div class="chat-page" data-controller="chat">
-  <div id="messages" class="chat-thread" role="log" aria-live="polite" data-chat-target="messages">
-    <% if @conversation.ai_messages.empty? %>
-      <div id="empty_hint" class="empty" data-size="sm">
-        <div class="empty-icon"><%= icon "sparkles" %></div>
-        <h3 class="empty-title">Ask about your invoices and meetings</h3>
-        <p class="empty-desc">Try "What was the total for the August invoice?" or "What are my open action items this week?"</p>
+  <section class="cx-main" aria-labelledby="t-chat">
+    <div id="cx_head"><%= render "cx_head", conversation: @conversation, title: (@conversation.title.presence || "New chat"), sub: assistant_sub %></div>
+
+    <%= tag.div flash_alerts, class: "flash-stack cx-flash" if flash[:alert] %>
+
+    <div class="cx-scroll cx-scroll-flex" data-controller="chat">
+      <div id="messages" class="chat-thread" role="log" aria-live="polite" aria-labelledby="t-chat" data-chat-target="messages">
+        <%= render partial: "message", collection: @conversation.ai_messages, as: :message %>
+        <div id="chat_bottom" data-chat-target="bottom"></div>
       </div>
-    <% end %>
+    </div>
 
-    <%= render partial: "message", collection: @conversation.ai_messages, as: :message %>
+    <div class="cx-dock">
+      <%= render "composer", url: ai_conversation_messages_path(@conversation), enabled: @sources_connected %>
+      <p class="caption cx-note">Answers draw on synced Fathom meetings, ClickUp tasks and Hubstaff time.</p>
+    </div>
+  </section>
 
-    <div id="chat_bottom" data-chat-target="bottom"></div>
-  </div>
-
-  <div class="chat-composer">
-    <%= render "message_form", conversation: @conversation %>
+  <div class="scrim" hidden data-dialogs-target="scrim" data-name="delete" data-action="click->dialogs#backdrop keydown.esc->dialogs#close">
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="del-t" aria-describedby="del-d" data-size="sm">
+      <div class="panel-header">
+        <span class="panel-icon" data-tone="danger" aria-hidden="true"><%= icon "trash" %></span>
+        <div class="panel-heading">
+          <h2 class="panel-title" id="del-t">Delete this chat?</h2>
+          <p class="panel-desc" id="del-d">&ldquo;<%= @conversation.title.presence || "New chat" %>&rdquo; and its answers will be deleted for good. Invoices and meetings are not affected.</p>
+        </div>
+      </div>
+      <div class="panel-footer">
+        <button type="button" class="btn btn-secondary" data-action="dialogs#close">Cancel</button>
+        <%= button_to "Delete chat", ai_conversation_path(@conversation), method: :delete, class: "btn btn-danger-subtle", form: { class: "inline-form" } %>
+      </div>
+    </div>
   </div>
 </div>

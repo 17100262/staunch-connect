@@ -1,0 +1,33 @@
+<%# Locals: conversation (or nil), title, sub. Title area, with inline rename and the actions menu when a chat exists. %>
+<header class="cx-head" data-controller="inline-edit">
+  <button type="button" class="icon-btn btn-ghost cx-list-toggle" data-size="sm" aria-label="Show chat list" data-action="chatlist#toggle"><%= icon "list" %></button>
+  <span class="tile" data-tone="primary" aria-hidden="true"><%= icon "message-circle" %></span>
+  <div class="cx-head-main">
+    <div data-inline-edit-target="view">
+      <h1 class="cx-title" id="t-chat"><%= title %></h1>
+      <p class="cx-sub"><%= sub %></p>
+    </div>
+    <% if conversation %>
+      <%= form_with model: conversation, url: ai_conversation_path(conversation), method: :patch, class: "cx-rename", html: { hidden: true }, data: { inline_edit_target: "form" } do |form| %>
+        <div class="input" data-size="sm">
+          <%= form.text_field :title, value: conversation.title, aria: { label: "Chat name" }, data: { inline_edit_target: "input", action: "keydown.esc->inline-edit#cancel" } %>
+        </div>
+        <button type="submit" class="btn btn-secondary" data-size="sm">Save</button>
+        <button type="button" class="btn btn-ghost" data-size="sm" data-action="inline-edit#cancel">Cancel</button>
+      <% end %>
+    <% end %>
+  </div>
+  <% if conversation %>
+    <div class="cx-head-actions">
+      <span class="menu-anchor" data-controller="toggle" data-action="click@window->toggle#outside keydown.esc->toggle#hide">
+        <button type="button" class="icon-btn btn-ghost" data-size="sm" aria-haspopup="menu" aria-expanded="false" aria-label="More actions" data-toggle-target="trigger" data-action="toggle#toggle"><%= icon "ellipsis" %></button>
+        <div class="menu" role="menu" aria-label="Chat actions" data-floating style="inset-block-start:calc(100% + var(--space-4));inset-inline-end:0" hidden data-toggle-target="panel">
+          <button type="button" role="menuitem" class="menu-item" data-action="inline-edit#start toggle#hide"><%= icon "pencil" %>Rename</button>
+          <button type="button" role="menuitem" class="menu-item" data-controller="clipboard" data-clipboard-text-value="<%= ai_conversation_url(conversation) %>" data-action="clipboard#copy toggle#hide"><%= icon "link" %>Copy link</button>
+          <div class="menu-sep" role="separator"></div>
+          <button type="button" role="menuitem" class="menu-item" data-tone="danger" data-action="dialogs#open toggle#hide" data-dialogs-name-param="delete"><%= icon "trash" %>Delete</button>
+        </div>
+      </span>
+    </div>
+  <% end %>
+</header>

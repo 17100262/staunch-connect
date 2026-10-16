@@ -7,14 +7,18 @@
   <body>
     <%= render "shared/icons" %>
 
-    <div class="app" data-layout="panel" data-controller="sidebar search" data-action="keydown@window->search#shortcut">
+    <div class="app" data-layout="panel" <%= "data-fixed" if content_for?(:full_bleed) %> data-controller="sidebar search" data-action="keydown@window->search#shortcut">
       <%= render "layouts/sidebar" %>
 
       <div class="app-main">
         <div class="app-body">
-          <main class="page">
+          <% if content_for?(:full_bleed) %>
             <%= yield %>
-          </main>
+          <% else %>
+            <main class="page">
+              <%= yield %>
+            </main>
+          <% end %>
         </div>
       </div>
 

@@ -1,0 +1,9 @@
+<%# Locals: url, enabled. Posts a question; the optimistic typing state is handled by the composer controller. %>
+<%= form_with url: url, method: :post, id: "message_form", class: "composer", data: { controller: "composer", action: "turbo:submit-start->composer#submitted keydown->composer#key" } do |form| %>
+  <div class="composer-attach"></div>
+  <%= form.text_area :question, rows: 1, class: "composer-field", placeholder: "Ask about an invoice, a meeting or a task", required: true, autofocus: enabled, disabled: !enabled, aria: { label: "Message" }, data: { composer_target: "field", action: "input->composer#grow" } %>
+  <div class="composer-tools">
+    <span class="grow"></span>
+    <button type="submit" class="icon-btn btn-primary composer-send" data-size="sm" aria-label="Send" <%= "disabled" unless enabled %> data-composer-target="send"><%= icon "arrow-up" %></button>
+  </div>
+<% end %>

@@ -11,6 +11,10 @@ export default class extends Controller {
     this.triggerTargets.forEach((t) => t.setAttribute("aria-expanded", String(open)))
   }
 
+  outside(event) {
+    if (!this.element.contains(event.target)) this.hide()
+  }
+
   hide() {
     this.panelTargets.forEach((p) => { p.hidden = true })
     this.triggerTargets.forEach((t) => t.setAttribute("aria-expanded", "false"))

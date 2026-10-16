@@ -1,44 +1,33 @@
 <% content_for :title, "AI Assistant" %>
+<% content_for :full_bleed, true %>
 
-<header class="page-header">
-  <h1 class="page-title">AI Assistant</h1>
-  <div class="page-actions">
-    <%= button_to ai_conversations_path, class: "btn btn-primary" do %><%= icon "plus" %>New conversation<% end %>
-  </div>
-</header>
+<div class="cx" data-controller="chatlist">
+  <%= render "chat_list", conversations: @conversations, current: nil, query: @query %>
 
-<%= tag.div flash_alerts, class: "flash-stack" if flash[:alert] %>
+  <section class="cx-main" aria-labelledby="t-chat">
+    <%= render "cx_head", conversation: nil, title: "New chat", sub: assistant_sub %>
 
-<% if @conversations.empty? %>
-  <div class="empty" data-variant="bordered">
-    <div class="empty-icon"><%= icon "sparkles" %></div>
-    <h3 class="empty-title">Ask about your invoices and meetings</h3>
-    <p class="empty-desc">Try "What was the total for the August invoice?" or "Which meeting discussed the AWS migration?"</p>
-  </div>
-<% else %>
-  <div class="table-card" data-variant="open">
-    <div class="table-scroll" tabindex="0" role="region" aria-label="Conversations">
-      <table class="table">
-        <caption class="sr-only">Conversations</caption>
-        <thead>
-          <tr>
-            <th scope="col">Conversation</th>
-            <th scope="col">Last activity</th>
-            <th scope="col" class="col-actions"><span class="sr-only">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          <% @conversations.each do |conversation| %>
-            <tr>
-              <td><div class="cell-primary"><%= link_to (conversation.title.presence || "New conversation"), ai_conversation_path(conversation) %></div></td>
-              <td class="cell-secondary"><%= conversation.updated_at.strftime("%-d %b %Y, %-I:%M %p") %></td>
-              <td class="col-actions">
-                <%= button_to ai_conversation_path(conversation), method: :delete, class: "icon-btn btn-ghost", data: { size: "sm" }, aria: { label: "Delete conversation" }, form: { data: { turbo_confirm: "Delete this conversation? This can't be undone." } } do %><%= icon "trash" %><% end %>
-              </td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
+    <%= tag.div flash_alerts, class: "flash-stack cx-flash" if flash[:alert] %>
+
+    <div class="cx-scroll cx-scroll-flex" data-controller="chat">
+      <% if @sources_connected %>
+        <div class="cx-empty" id="empty_hint">
+          <span class="tile" data-size="lg" data-tone="primary" aria-hidden="true"><%= icon "sparkles" %></span>
+          <h2 class="t-heading-md" style="margin:0">What do you want to know?</h2>
+          <p class="cx-sub">Ask about invoices, meetings or task time. Answers come from your synced data.</p>
+        </div>
+        <div id="messages" class="chat-thread" role="log" aria-live="polite" data-chat-target="messages" hidden>
+          <div id="chat_bottom" data-chat-target="bottom"></div>
+        </div>
+      <% else %>
+        <%= render "gate" %>
+        <div id="messages" data-chat-target="messages" hidden><div id="chat_bottom" data-chat-target="bottom"></div></div>
+      <% end %>
     </div>
-  </div>
-<% end %>
+
+    <div class="cx-dock">
+      <%= render "composer", url: ai_conversations_path, enabled: @sources_connected %>
+      <p class="caption cx-note">Answers draw on synced Fathom meetings, ClickUp tasks and Hubstaff time.</p>
+    </div>
+  </section>
+</div>

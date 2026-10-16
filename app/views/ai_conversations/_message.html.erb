@@ -2,20 +2,36 @@
   <div class="msg-user pre-wrap"><%= message.content %></div>
 <% else %>
   <div class="msg-ai">
-    <span class="avatar" data-size="sm" data-tone="brand"><%= icon "sparkles" %></span>
+    <span class="avatar" data-size="sm"><%= icon "sparkles" %></span>
     <div class="msg-body">
-      <p class="pre-wrap"><%= message.content %></p>
+      <%= assistant_html(message.content) %>
+
       <% if message.tool_calls.present? %>
-        <details class="tool-calls">
-          <summary class="caption">Data used (<%= pluralize(message.tool_calls.size, "lookup") %>)</summary>
-          <% message.tool_calls.each do |call| %>
-            <div class="tool-call code">
-              <div><strong><%= call["name"] %></strong>(<%= call["input"].to_json %>)</div>
-              <div class="pre-wrap"><%= JSON.pretty_generate(call["result"]) %></div>
-            </div>
-          <% end %>
+        <details class="tool-call">
+          <summary>
+            <%= icon "search" %>
+            <span class="grow body-sm">Used <%= pluralize(message.tool_calls.size, "lookup") %> to answer</span>
+            <%= icon "chevron-down" %>
+          </summary>
+          <div class="tool-call-body">
+            <% message.tool_calls.each do |call| %>
+              <div>
+                <span class="label-sm"><%= call["name"] %></span>
+                <code class="code"><%= call["input"].to_json %></code>
+                <% result = JSON.pretty_generate(call["result"]) %>
+                <code class="code pre-wrap"><%= result.truncate(1500) %></code>
+              </div>
+            <% end %>
+          </div>
         </details>
       <% end %>
+
+      <div class="msg-foot">
+        <span class="tooltip-wrap" data-placement="top">
+          <button type="button" class="icon-btn btn-ghost" data-size="sm" aria-label="Copy answer" data-controller="clipboard" data-clipboard-text-value="<%= message.content %>" data-action="clipboard#copy"><%= icon "copy" %></button>
+          <span class="tooltip" role="tooltip">Copy answer</span>
+        </span>
+      </div>
     </div>
   </div>
 <% end %>

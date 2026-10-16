@@ -20,7 +20,7 @@ Rails.application.routes.draw do
   end
   resources :project_mappings, only: %i[create destroy]
 
-  resources :ai_conversations, only: %i[index show create destroy] do
+  resources :ai_conversations, only: %i[index show create update destroy] do
     resources :messages, only: %i[create], controller: "ai_messages"
   end
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
