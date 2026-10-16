@@ -65,3 +65,56 @@ jobs:
       - name: Lint code for consistent style
         run: bin/rubocop -f github
 
+
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # pgvector is required by transcript_chunks.embedding
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: --health-cmd="pg_isready" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    env:
+      RAILS_ENV: test
+      CI: "true"
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/staunch_connect_test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Set up Chrome
+        uses: browser-actions/setup-chrome@v1
+
+      - name: Prepare database
+        run: bin/rails db:test:prepare
+
+      - name: Run specs
+        run: bundle exec rspec
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage
+          if-no-files-found: ignore
+
+      - name: Upload system spec screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: tmp/capybara
+          if-no-files-found: ignore

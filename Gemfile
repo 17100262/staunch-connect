@@ -66,6 +66,23 @@ group :development, :test do
 
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
+
+  # Test framework [https://github.com/rspec/rspec-rails]
+  gem "rspec-rails"
+  gem "factory_bot_rails"
+  gem "faker"
+end
+
+group :test do
+  gem "shoulda-matchers"
+  # Blocks real HTTP and stubs the ClickUp/Hubstaff/Fathom/Voyage/Anthropic APIs
+  gem "webmock"
+  # Browser-level system specs on headless Chrome via CDP (no chromedriver/Node needed)
+  gem "capybara"
+  gem "cuprite"
+  gem "simplecov", require: false
+  # Reads generated XLSX exports back in specs
+  gem "roo"
 end
 
 group :development do
