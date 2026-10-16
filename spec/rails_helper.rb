@@ -2,6 +2,11 @@ require "simplecov"
 SimpleCov.start "rails" do
   enable_coverage :branch
   group "Services", "app/services"
+
+  # Enforced on full CI runs only, so running a single spec file locally doesn't fail on coverage.
+  if ENV["CI"]
+    minimum_coverage line: 90, branch: 80
+  end
 end
 
 require "spec_helper"
