@@ -10,7 +10,10 @@
     <%= tag.div flash_alerts, class: "flash-stack cx-flash" if flash[:alert] %>
 
     <div class="cx-scroll cx-scroll-flex" data-controller="chat">
-      <% if @sources_connected %>
+      <% if !@ai_ready %>
+        <%= render "ai_gate" %>
+        <div id="messages" data-chat-target="messages" hidden><div id="chat_bottom" data-chat-target="bottom"></div></div>
+      <% elsif @sources_connected %>
         <div class="cx-empty" id="empty_hint">
           <span class="tile" data-size="lg" data-tone="primary" aria-hidden="true"><%= icon "sparkles" %></span>
           <h2 class="t-heading-md" style="margin:0">What do you want to know?</h2>
@@ -26,7 +29,7 @@
     </div>
 
     <div class="cx-dock">
-      <%= render "composer", url: ai_conversations_path, enabled: @sources_connected %>
+      <%= render "composer", url: ai_conversations_path, enabled: (@sources_connected && @ai_ready) %>
       <p class="caption cx-note">Answers draw on synced Fathom meetings, ClickUp tasks and Hubstaff time.</p>
     </div>
   </section>

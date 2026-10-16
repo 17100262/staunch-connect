@@ -86,6 +86,8 @@ module ApplicationHelper
   end
 
   def assistant_sub(names = assistant_source_names)
+    return "Needs an Anthropic API key" unless AiAssistant.configured?
+
     names.any? ? "Uses #{source_summary(names)}" : "Needs at least one connected source"
   end
 

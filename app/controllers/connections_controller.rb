@@ -1,6 +1,6 @@
 class ConnectionsController < ApplicationController
-  AUTH_ERRORS = [ ClickupClient::AuthenticationError, HubstaffClient::AuthenticationError, FathomClient::AuthenticationError ].freeze
-  REQUEST_ERRORS = [ ClickupClient::RequestError, HubstaffClient::RequestError, FathomClient::RequestError ].freeze
+  AUTH_ERRORS = [ ClickupClient::AuthenticationError, HubstaffClient::AuthenticationError, FathomClient::AuthenticationError, AnthropicConnection::AuthenticationError ].freeze
+  REQUEST_ERRORS = [ ClickupClient::RequestError, HubstaffClient::RequestError, FathomClient::RequestError, AnthropicConnection::RequestError ].freeze
 
   # Connectors live in the settings modal now; this keeps the old URL (and the
   # redirects after connect, sync and disconnect) working.
@@ -60,7 +60,7 @@ class ConnectionsController < ApplicationController
       client.verify!
       persist_client_tokens(connection, client)
       connection.update!(status: :connected, last_error: nil, last_used_at: Time.current)
-      redirect_to after_sync_path, notice: "#{connection.source.capitalize} synced."
+      redirect_to after_sync_path, notice: (connection.source == "anthropic" ? "Anthropic key works." : "#{connection.source.capitalize} synced.")
     rescue *AUTH_ERRORS => e
       mark_error(connection, e.message)
     rescue *REQUEST_ERRORS => e
@@ -100,6 +100,8 @@ class ConnectionsController < ApplicationController
       ClickupClient.new(connection.credential)
     when "fathom"
       FathomClient.new(connection.credential)
+    when "anthropic"
+      AnthropicConnection.new(connection.credential)
     end
   end
 

@@ -53,5 +53,6 @@ class AiConversationsController < ApplicationController
   # The assistant has nothing to answer with when no source is connected.
   def load_sources
     @sources_connected = helpers.assistant_source_names.any?
+    @ai_ready = AiAssistant.configured?
   end
 end

@@ -92,8 +92,17 @@ class AiAssistant
     @client ||= Anthropic::Client.new(api_key: api_key)
   end
 
+  # The key saved in Settings wins; the environment variable and Rails credentials
+  # stay as fallbacks for deployments that configure it there.
   def api_key
-    ENV["ANTHROPIC_API_KEY"].presence || Rails.application.credentials.anthropic_api_key ||
-      raise(ConfigurationError, "Set ANTHROPIC_API_KEY (or credentials.anthropic_api_key) to use the AI Assistant.")
+    self.class.api_key || raise(ConfigurationError, "Add your Anthropic API key in Settings > Connectors to use the AI Assistant.")
+  end
+
+  def self.api_key
+    Connection.anthropic_key || ENV["ANTHROPIC_API_KEY"].presence || Rails.application.credentials.anthropic_api_key.presence
+  end
+
+  def self.configured?
+    api_key.present?
   end
 end

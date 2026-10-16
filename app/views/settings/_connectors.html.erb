@@ -2,16 +2,19 @@
   meta = {
     "hubstaff" => { initials: "HS", name: "Hubstaff", desc: "Time tracking", field: "Personal token", hint: "Find it in Hubstaff under your profile settings. We only read data." },
     "clickup" => { initials: "CU", name: "ClickUp", desc: "Tasks and estimates", field: "Personal token", hint: "Find it in ClickUp under your profile settings. We only read data." },
-    "fathom" => { initials: "FA", name: "Fathom", desc: "Meeting recordings and transcripts", field: "API key", hint: "Find it in Fathom under your profile settings. We only read data." }
+    "fathom" => { initials: "FA", name: "Fathom", desc: "Meeting recordings and transcripts", field: "API key", hint: "Find it in Fathom under your profile settings. We only read data." },
+    "anthropic" => { initials: "AI", name: "Anthropic", desc: "Powers the AI Assistant", field: "API key", hint: "Create a key at console.anthropic.com. It is only used to answer your questions in the assistant." }
   }
+  ai_source = "anthropic"
   syncing = @connections.values.compact.any?(&:syncing?)
 %>
 <section aria-label="Connectors">
   <div class="sm-stack">
-    <p class="card-desc" style="margin:0">Start with Hubstaff and ClickUp, they unlock invoicing. Fathom is optional.</p>
+    <p class="card-desc" style="margin:0">Start with Hubstaff and ClickUp, they unlock invoicing. Fathom is optional. The AI Assistant needs an Anthropic key.</p>
     <% if syncing %><span data-poll-target="active" hidden></span><% end %>
 
     <% meta.each do |source, info| %>
+      <% if source == ai_source %><h4 class="caption">AI Assistant</h4><% end %>
       <% connection = @connections[source] %>
       <% status = connection&.status || "disconnected" %>
       <% connected = connection&.connected? || connection&.syncing? %>
@@ -22,6 +25,7 @@
             <h4 class="card-title"><%= info[:name] %></h4>
             <p class="card-desc">
               <% if status == "syncing" %>Syncing in the background…
+              <% elsif connected && source == ai_source %><%= info[:desc] %> · key ending <%= connection.credential.to_s.last(4) %>
               <% elsif connected %><%= info[:desc] %> · last synced <%= connection.last_used_at ? "#{time_ago_in_words(connection.last_used_at)} ago" : "never" %>
               <% elsif status == "error" %><%= connection.last_error %>
               <% else %><%= info[:desc] %>
@@ -34,8 +38,8 @@
           <% elsif connected %>
             <span class="badge" data-tone="success"><span class="badge-dot"></span>Connected</span>
             <span class="tooltip-wrap" data-placement="bottom">
-              <%= button_to sync_connection_path(connection), method: :post, class: "icon-btn btn-secondary", data: { size: "sm" }, aria: { label: "Sync #{info[:name]} now" }, form: { class: "inline-form" } do %><%= icon "rotate-cw" %><% end %>
-              <span class="tooltip" role="tooltip">Sync now</span>
+              <%= button_to sync_connection_path(connection), method: :post, class: "icon-btn btn-secondary", data: { size: "sm" }, aria: { label: (source == ai_source ? "Check the #{info[:name]} key" : "Sync #{info[:name]} now") }, form: { class: "inline-form" } do %><%= icon "rotate-cw" %><% end %>
+              <span class="tooltip" role="tooltip"><%= source == ai_source ? "Check key" : "Sync now" %></span>
             </span>
             <span class="menu-anchor" data-controller="toggle" data-action="click@window->toggle#outside keydown.esc->toggle#hide">
               <button type="button" class="icon-btn btn-ghost" data-size="sm" aria-haspopup="menu" aria-expanded="false" aria-label="More actions for <%= info[:name] %>" data-toggle-target="trigger" data-action="toggle#toggle"><%= icon "ellipsis" %></button>

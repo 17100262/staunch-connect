@@ -17,7 +17,7 @@ class HomeController < ApplicationController
   def load_sources
     connected = Connection.where(status: %w[connected syncing]).pluck(:source)
     @connected_sources = connected
-    @missing_sources = Connection::SOURCES - connected
+    @missing_sources = Connection::DATA_SOURCES - connected
     @nothing_connected = connected.empty?
   end
 

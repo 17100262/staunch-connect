@@ -17,7 +17,13 @@
     </div>
 
     <div class="cx-dock">
-      <%= render "composer", url: ai_conversation_messages_path(@conversation), enabled: @sources_connected %>
+      <% unless @ai_ready %>
+        <div class="alert" role="status" data-tone="warning">
+          <%= icon "triangle-alert" %>
+          <div class="alert-content">The assistant has no Anthropic API key. <%= link_to "Add one in Settings", settings_path(section: "connectors"), class: "link", data: { turbo_frame: "modal" } %> to keep chatting.</div>
+        </div>
+      <% end %>
+      <%= render "composer", url: ai_conversation_messages_path(@conversation), enabled: (@sources_connected && @ai_ready) %>
       <p class="caption cx-note">Answers draw on synced Fathom meetings, ClickUp tasks and Hubstaff time.</p>
     </div>
   </section>
