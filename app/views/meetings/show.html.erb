@@ -17,8 +17,8 @@
       </ol></nav>
     </div>
     <div class="topbar-end">
-      <% if @meeting.fathom_url.present? %>
-        <%= link_to @meeting.fathom_url, target: "_blank", rel: "noopener", class: "btn btn-ghost" do %><%= icon "external" %>View in Fathom<% end %>
+      <% if (fathom_link = @meeting.fathom_link) %>
+        <%= link_to fathom_link, target: "_blank", rel: "noopener", class: "btn btn-ghost" do %><%= icon "external" %>View in Fathom<% end %>
       <% end %>
       <%= link_to ai_conversations_path, class: "btn btn-primary" do %><%= icon "message-circle" %>Start a chat<% end %>
     </div>

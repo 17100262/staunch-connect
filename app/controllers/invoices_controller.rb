@@ -6,6 +6,7 @@ class InvoicesController < ApplicationController
 
   TICKET_NUMBER_FIELD_NAMES = [ "harper ticket number", "ticket number", "htn" ].freeze
   NO_FOLDER = "none"
+  SETUP_STEP_TEMPLATES = { 1 => "invoices/setup/step1", 2 => "invoices/setup/step2", 3 => "invoices/setup/step3" }.freeze
 
   before_action :require_connections, only: %i[new draft create]
 
@@ -36,7 +37,7 @@ class InvoicesController < ApplicationController
     end
 
     persist_hubstaff_tokens!
-    render "invoices/setup/step#{@step}"
+    render SETUP_STEP_TEMPLATES.fetch(@step)
   rescue *RETRYABLE_ERRORS => e
     persist_hubstaff_tokens!
     @error = e.message
@@ -275,9 +276,9 @@ class InvoicesController < ApplicationController
 
     @hub_id, @hub_name = hubstaff_selection(@setup["hubstaff_project_value"], @mapping)
     @hub_state = if @hub_id.blank? then "none"
-                 elsif @matched_hub && @matched_hub[:id].to_s == @hub_id.to_s then "matched"
-                 else "chosen"
-                 end
+    elsif @matched_hub && @matched_hub[:id].to_s == @hub_id.to_s then "matched"
+    else "chosen"
+    end
     @rate = rate_from(@setup["rate"], @mapping)
     @month = valid_month(@setup["month"])
     @month_options = last_12_months
