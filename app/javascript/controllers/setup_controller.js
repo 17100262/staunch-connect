@@ -20,7 +20,7 @@ export default class extends Controller {
     const value = this.rateInputTarget.value.trim()
     const ok = /^\d+(\.\d+)?$/.test(value) && parseFloat(value) > 0
     this.rateErrorTarget.hidden = ok
-    this.rateEditorTarget.querySelector(".input").setAttribute("aria-invalid", String(!ok))
+    this.rateEditorTarget.setAttribute("aria-invalid", String(!ok))
     this.buildTarget.disabled = !ok
     if (ok) {
       this.rateFieldTarget.value = value
