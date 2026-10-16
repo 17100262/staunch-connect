@@ -50,4 +50,10 @@ Rails.application.configure do
 
   # Raise error when a before_action's only/except options reference missing actions.
   config.action_controller.raise_on_missing_callback_actions = true
+
+  # Fixed keys so encrypted Connection columns work without RAILS_MASTER_KEY (e.g. in CI).
+  # Test-only values; production keys live in credentials.
+  config.active_record.encryption.primary_key = "test-primary-key-0123456789abcdef"
+  config.active_record.encryption.deterministic_key = "test-deterministic-key-0123456789"
+  config.active_record.encryption.key_derivation_salt = "test-key-derivation-salt-0123456"
 end
