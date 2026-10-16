@@ -147,3 +147,9 @@ body.guest {
 .page-body-stack { margin-top: var(--space-24); }
 .table th.num, .table td.num { text-align: end; }
 .row-actions { display: inline-flex; align-items: center; justify-content: flex-end; gap: var(--space-4); flex-wrap: nowrap; }
+
+/* The setup modal loads from the server: dim the page and show a spinner right away. */
+turbo-frame#modal[aria-busy="true"] { position: fixed; inset: 0; z-index: var(--z-modal); display: grid; place-items: center; background: var(--bg-scrim); }
+turbo-frame#modal[aria-busy="true"]::after { content: ""; width: 32px; height: 32px; border-radius: var(--radius-full); border: 3px solid rgba(255, 255, 255, .35); border-top-color: var(--bg-surface); animation: modal-spin 700ms linear infinite; }
+@keyframes modal-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { turbo-frame#modal[aria-busy="true"]::after { animation: none; } }

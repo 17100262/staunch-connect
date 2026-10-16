@@ -9,6 +9,11 @@ class ClickupClient
   BASE_URL = "https://api.clickup.com/api/v2"
   TASKS_PER_PAGE = 100
 
+  # Workspace structure (teams, spaces, folders, lists) changes rarely but is
+  # fetched on every "Create invoice" click, so it is cached briefly per process.
+  # Tasks are never cached: reconciliation must reflect ClickUp right now.
+  STRUCTURE_CACHE = ActiveSupport::Cache::MemoryStore.new(expires_in: 5.minutes)
+
   def initialize(token)
     @token = token
   end
@@ -19,19 +24,19 @@ class ClickupClient
   end
 
   def teams
-    get("/team")["teams"]
+    cached("/team") { get("/team")["teams"] }
   end
 
   def spaces(team_id)
-    get("/team/#{team_id}/space")["spaces"]
+    cached("/team/#{team_id}/space") { get("/team/#{team_id}/space")["spaces"] }
   end
 
   def folders(space_id)
-    get("/space/#{space_id}/folder")["folders"]
+    cached("/space/#{space_id}/folder") { get("/space/#{space_id}/folder")["folders"] }
   end
 
   def lists(space_id)
-    get("/space/#{space_id}/list")["lists"]
+    cached("/space/#{space_id}/list") { get("/space/#{space_id}/list")["lists"] }
   end
 
   # Returns tasks and their subtasks as a single flat array — ClickUp distinguishes
@@ -53,6 +58,10 @@ class ClickupClient
   end
 
   private
+
+  def cached(path, &block)
+    STRUCTURE_CACHE.fetch([ Digest::SHA256.hexdigest(@token.to_s), path ], &block)
+  end
 
   def get(path, query = {})
     uri = URI("#{BASE_URL}#{path}")
