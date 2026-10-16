@@ -4,7 +4,7 @@
   <h1 class="page-title">Home</h1>
 </header>
 
-<%= tag.div flash_alerts, class: "flash-stack" if flash.any? %>
+<%= tag.div flash_alerts, class: "flash-stack" if flash[:alert] %>
 
 <section class="banner" aria-labelledby="home-banner">
   <div class="banner-body">

@@ -1,0 +1,17 @@
+<turbo-frame id="modal">
+  <div class="scrim" data-controller="modal" data-action="click->modal#backdrop">
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="err-t" aria-describedby="err-d" data-size="sm">
+      <div class="panel-header">
+        <span class="panel-icon" data-tone="warning" aria-hidden="true"><%= icon "triangle-alert" %></span>
+        <div class="panel-heading">
+          <h2 class="panel-title" id="err-t">Couldn't load the setup</h2>
+          <p class="panel-desc" id="err-d"><%= @error %></p>
+        </div>
+      </div>
+      <div class="panel-footer">
+        <button type="button" class="btn btn-secondary" data-action="modal#close">Close</button>
+        <%= link_to "Open settings", connections_path, class: "btn btn-primary", data: { turbo_frame: "_top" } %>
+      </div>
+    </div>
+  </div>
+</turbo-frame>

@@ -1,56 +1,80 @@
-<% content_for :title, "Invoicing" %>
-<% project_name = @mapping.clickup_folder_name.presence || @mapping.clickup_space_name.presence || @clickup_space_id %>
-
-<nav class="breadcrumb" aria-label="Breadcrumb"><ol>
-  <li><%= link_to "Invoicing", invoices_path %><span class="breadcrumb-sep" aria-hidden="true"><%= icon "chevron-right" %></span></li>
-  <li><span aria-current="page"><%= project_name %></span></li>
-</ol></nav>
+<% content_for :title, "Review invoice" %>
+<%
+  est = @total_estimate_hours
+  logged = @total_logged_hours
+  compared = @hub_id.present?
+  diff = compared ? logged - est : nil
+  pct = compared && est.positive? ? (logged / est * 100).round : 0
+  cmp_text = pct > 100 ? "#{pct - 100}% over" : (pct < 100 ? "#{100 - pct}% under" : "On estimate")
+  cmp_tone = pct > 120 ? "danger" : (pct > 100 ? "warning" : "success")
+  diff_note = diff.to_f > 0 ? "Hubstaff has more hours than ClickUp" : (diff.to_f < 0 ? "Hubstaff has fewer hours than ClickUp" : "Hubstaff matches ClickUp")
+  setup_for_edit = @setup.merge("step" => 3, "mode" => "review", "month" => @month, "rate" => @rate.to_s, "hubstaff_project_value" => (compared ? "#{@hub_id}|#{@hub_name}" : "none"))
+%>
 
 <header class="page-header">
   <div>
-    <h1 class="page-title">New invoice</h1>
-    <p class="page-desc"><%= project_name %> · Hubstaff project "<%= @mapping.hubstaff_project_name %>"</p>
+    <h1 class="page-title">Review</h1>
+    <p class="page-desc"><%= @project_name %> · <%= Date.strptime(@month, "%Y-%m").strftime("%B %Y") %></p>
   </div>
-  <%= form_with url: invoicing_draft_path, method: :get, class: "page-actions" do |form| %>
-    <%= form.hidden_field :clickup_space_id, value: @clickup_space_id %>
-    <%= form.hidden_field :clickup_folder_id, value: @clickup_folder_id %>
-    <% @list_ids.each do |list_id| %>
-      <%= hidden_field_tag "list_ids[]", list_id %>
-    <% end %>
-    <div class="field">
-      <label class="field-label" for="month">Billing period</label>
-      <div class="select" data-size="sm">
-        <select name="month" id="month" onchange="this.form.requestSubmit()">
-          <% @month_options.each do |value, label| %>
-            <option value="<%= value %>" <%= "selected" if value == @month %>><%= label %></option>
-          <% end %>
-        </select>
-        <%= icon "chevron-down" %>
-      </div>
-    </div>
-  <% end %>
+  <div class="page-actions">
+    <%= link_to invoicing_path(setup_for_edit), class: "btn btn-ghost", data: { turbo_frame: "modal" } do %><%= icon "pencil" %>Edit setup<% end %>
+  </div>
 </header>
 
-<%= render "invoices/flow_steps", current: 4 %>
-<%= tag.div flash_alerts, class: "flash-stack" if flash.any? %>
+<%= tag.div flash_alerts, class: "flash-stack" if flash[:alert] %>
 
-<div class="stats">
-  <div class="stat-cell"><div class="stat"><span class="stat-label">Estimated</span><span class="stat-value"><%= number_with_precision(@total_estimate_hours, precision: 1) %>h</span></div></div>
-  <div class="stat-cell"><div class="stat"><span class="stat-label">Logged (Hubstaff)</span><span class="stat-value"><%= number_with_precision(@total_logged_hours, precision: 1) %>h</span></div></div>
-  <div class="stat-cell"><div class="stat"><span class="stat-label">Invoice total</span><span class="stat-value"><%= number_to_currency(@total_amount) %></span></div></div>
+<div class="review-meta">
+  <p class="body-sm" style="margin:0;color:var(--fg-secondary)">
+    <% if compared %>Compared with Hubstaff project &ldquo;<%= @hub_name %>&rdquo;<% else %>Not compared with Hubstaff<% end %>
+  </p>
+  <%= form_with url: invoicing_draft_path, method: :get, class: "period" do |form| %>
+    <%= render "invoices/setup/carry", except: %w[month step mode] %>
+    <label class="body-sm" style="color:var(--fg-secondary)" for="rv-m">Billing period</label>
+    <div class="select">
+      <select id="rv-m" name="month" onchange="this.form.requestSubmit()">
+        <% @month_options.each do |value, label| %><option value="<%= value %>" <%= "selected" if value == @month %>><%= label %></option><% end %>
+      </select>
+      <%= icon "chevron-down" %>
+    </div>
+  <% end %>
 </div>
 
-<% unless @mapping.default_hourly_rate %>
+<div class="stats stats-4">
+  <div class="stat-cell"><div class="stat"><span class="stat-label">ClickUp estimate</span><span class="stat-value"><%= number_with_precision(est, precision: 1) %> h</span><div class="stat-foot"><span><%= pluralize(@line_items.size, "task") %></span></div></div></div>
+  <div class="stat-cell"><div class="stat"><span class="stat-label">Hubstaff logged</span><span class="stat-value"><%= compared ? "#{number_with_precision(logged, precision: 1)} h" : "—" %></span><div class="stat-foot"><span><%= compared ? Date.strptime(@month, "%Y-%m").strftime("%B %Y") : "Not compared" %></span></div></div></div>
+  <div class="stat-cell"><div class="stat">
+    <span class="stat-label stat-label-info">Difference
+      <span class="tooltip-wrap" data-placement="bottom">
+        <button type="button" class="icon-btn btn-ghost" data-size="sm" aria-label="What the difference means" aria-describedby="tp-diff"><%= icon "info" %></button>
+        <span class="tooltip" role="tooltip" id="tp-diff">Hubstaff logged hours minus ClickUp estimated hours. A plus means the team logged more time than estimated, a minus means less. &ldquo;42% over&rdquo; means Hubstaff is 42% above the ClickUp estimate.</span>
+      </span>
+    </span>
+    <span class="stat-value"><%= compared ? "#{diff.positive? ? '+' : (diff.negative? ? '−' : '')}#{number_with_precision(diff.abs, precision: 1)} h" : "—" %></span>
+    <div class="stat-foot">
+      <% if compared %>
+        <span class="tooltip-wrap" data-placement="bottom">
+          <span class="badge" tabindex="0" data-tone="<%= cmp_tone %>" aria-describedby="tp-note"><%= cmp_text %></span>
+          <span class="tooltip" role="tooltip" id="tp-note"><%= diff_note %></span>
+        </span>
+      <% else %>
+        <span>Not compared</span>
+      <% end %>
+    </div>
+  </div></div>
+  <div class="stat-cell"><div class="stat"><span class="stat-label">Invoice total</span><span class="stat-value"><%= number_to_currency(@total_amount) %></span><div class="stat-foot"><span><%= number_to_currency(@rate) %> per hour</span></div></div></div>
+</div>
+
+<% unless @rate.positive? %>
   <div class="alert" role="status" data-tone="warning">
     <%= icon "triangle-alert" %>
-    <div class="alert-content">No hourly rate is set for this project, so amounts show as $0.00. Set one on the <%= link_to "project mapping", invoicing_path(clickup_space_id: @clickup_space_id, clickup_folder_id: @clickup_folder_id), class: "link" %>.</div>
+    <div class="alert-content">No hourly rate is set, so amounts show as $0.00. Use Edit setup to set one.</div>
   </div>
 <% end %>
 
 <div class="table-card">
-  <div class="table-scroll" tabindex="0" role="region" aria-label="Tasks">
+  <div class="table-scroll" tabindex="0" role="region" aria-label="Reconciliation">
     <table class="table">
-      <caption class="sr-only">Tasks</caption>
+      <caption class="sr-only">Tasks from the chosen lists with ticket, ClickUp estimate, rate and amount. Review only.</caption>
       <thead>
         <tr>
           <th scope="col">Task</th>
@@ -60,53 +84,50 @@
           <th scope="col" class="num">Amount</th>
         </tr>
       </thead>
-      <tbody>
-        <% if @line_items.empty? %>
-          <tr><td colspan="5" class="cell-secondary">No tasks found in the selected list(s).</td></tr>
-        <% else %>
-          <% @line_items.each do |item| %>
-            <% amount = (item[:estimate_hours] || 0) * (@mapping.default_hourly_rate || 0) %>
-            <% subtask_titles = item[:notes].to_s.split("\n").map { |line| line.delete_prefix("• ") } %>
+      <% if @line_items.empty? %>
+        <tbody><tr><td colspan="5" class="cell-secondary">No tasks found in the selected list(s).</td></tr></tbody>
+      <% else %>
+        <% @line_items.each do |item| %>
+          <% subtasks = item[:notes].to_s.split("\n").map { |line| line.delete_prefix("• ") }.reject(&:blank?) %>
+          <tbody data-controller="toggle">
             <tr>
               <td>
-                <div class="cell-primary"><span><%= item[:title] %></span></div>
-                <% if subtask_titles.any? %>
-                  <details>
-                    <summary class="label-sm"><%= pluralize(subtask_titles.size, "subtask") %></summary>
-                    <ul class="sub-list">
-                      <% subtask_titles.each do |title| %><li><%= title %></li><% end %>
-                    </ul>
-                  </details>
-                <% end %>
+                <div class="cell-with-action">
+                  <span><%= item[:title] %></span>
+                  <% if subtasks.any? %>
+                    <button type="button" class="btn btn-ghost" data-size="sm" aria-expanded="false" data-toggle-target="trigger" data-action="toggle#toggle"><%= pluralize(subtasks.size, "subtask") %><%= icon "chevron-down" %></button>
+                  <% end %>
+                </div>
               </td>
               <td class="cell-secondary code"><%= item[:ticket] %></td>
-              <td class="cell-secondary num"><%= item[:estimate_hours] ? "#{number_with_precision(item[:estimate_hours], precision: 1)}h" : "—" %></td>
-              <td class="cell-secondary num"><%= @mapping.default_hourly_rate ? number_to_currency(@mapping.default_hourly_rate) : "—" %></td>
-              <td class="num"><%= number_to_currency(amount) %></td>
+              <td class="cell-secondary num"><%= item[:estimate_hours] ? "#{number_with_precision(item[:estimate_hours], precision: 1)} h" : "—" %></td>
+              <td class="cell-secondary num"><%= number_to_currency(@rate) %></td>
+              <td class="num"><%= number_to_currency((item[:estimate_hours] || 0) * @rate) %></td>
             </tr>
-          <% end %>
-          <tr class="table-total">
-            <td colspan="4" class="num">Total</td>
-            <td class="num"><%= number_to_currency(@total_amount) %></td>
-          </tr>
+            <% subtasks.each do |title| %>
+              <tr class="sub-row" hidden data-toggle-target="panel">
+                <td style="padding-inline-start:var(--space-32)"><span class="body-sm" style="color:var(--fg-secondary)"><%= title %></span></td>
+                <td></td><td></td><td></td><td></td>
+              </tr>
+            <% end %>
+          </tbody>
         <% end %>
-      </tbody>
+      <% end %>
+      <tfoot>
+        <tr><td></td><td></td><td></td><td class="num" style="font-weight:600">Total</td><td class="num" style="font-weight:600"><%= number_to_currency(@total_amount) %></td></tr>
+      </tfoot>
     </table>
   </div>
 </div>
 
-<div class="toolbar-split">
-  <%= link_to invoicing_path(clickup_space_id: @clickup_space_id, clickup_folder_id: @clickup_folder_id), class: "btn btn-ghost" do %><%= icon "chevron-left" %>Back to project<% end %>
-
-  <% if @line_items.any? %>
+<% if @line_items.any? %>
+  <div class="actions-end">
     <%= form_with url: invoices_path, method: :post do |form| %>
-      <%= form.hidden_field :clickup_space_id, value: @clickup_space_id %>
-      <%= form.hidden_field :clickup_folder_id, value: @clickup_folder_id %>
-      <% @list_ids.each do |list_id| %>
-        <%= hidden_field_tag "list_ids[]", list_id %>
-      <% end %>
-      <%= form.hidden_field :month, value: @month %>
+      <%= render "invoices/setup/carry", except: %w[month rate hubstaff_project_value step mode] %>
+      <%= hidden_field_tag :month, @month, id: nil %>
+      <%= hidden_field_tag :rate, @rate.to_s, id: nil %>
+      <%= hidden_field_tag :hubstaff_project_value, (compared ? "#{@hub_id}|#{@hub_name}" : "none"), id: nil %>
       <%= form.button "Save as invoice", type: :submit, class: "btn btn-primary" %>
     <% end %>
-  <% end %>
-</div>
+  </div>
+<% end %>

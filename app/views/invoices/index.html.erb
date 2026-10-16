@@ -1,20 +1,25 @@
 <% content_for :title, "Invoicing" %>
 
 <header class="page-header">
-  <h1 class="page-title">Invoicing</h1>
+  <div>
+    <h1 class="page-title">Invoicing</h1>
+    <p class="page-desc">All invoices across your connected projects</p>
+  </div>
   <div class="page-actions">
-    <%= link_to invoicing_path, class: "btn btn-primary" do %><%= icon "plus" %>Create invoice<% end %>
+    <%= link_to invoicing_path, class: "btn btn-primary", data: { turbo_frame: "modal" } do %><%= icon "plus" %>Create invoice<% end %>
   </div>
 </header>
 
-<%= tag.div flash_alerts, class: "flash-stack" if flash.any? %>
+<%= tag.div flash_alerts, class: "flash-stack" if flash[:alert] %>
 
 <% if @invoices.empty? %>
   <div class="empty" data-variant="bordered">
     <div class="empty-icon"><%= icon "file" %></div>
     <h3 class="empty-title">No invoices yet</h3>
     <p class="empty-desc">Build a reconciliation from a ClickUp project's tasks and Hubstaff's logged hours, then save it as an invoice.</p>
-    <div class="empty-actions"><%= link_to invoicing_path, class: "btn btn-primary" do %><%= icon "plus" %>Create invoice<% end %></div>
+    <div class="empty-actions">
+      <%= link_to invoicing_path, class: "btn btn-primary", data: { turbo_frame: "modal" } do %><%= icon "plus" %>Create invoice<% end %>
+    </div>
   </div>
 <% else %>
   <div class="table-card" data-variant="open">
@@ -32,14 +37,34 @@
         </thead>
         <tbody>
           <% @invoices.each do |invoice| %>
-            <tr>
-              <td><div class="cell-primary"><%= link_to invoice.name, invoice_path(invoice) %></div></td>
+            <tr data-controller="dialog">
+              <td><%= link_to invoice.name, invoice_path(invoice) %></td>
               <td class="cell-secondary"><%= Date.strptime(invoice.month, "%Y-%m").strftime("%B %Y") %></td>
               <td class="cell-secondary num"><%= number_with_precision(invoice.total_estimate_hours, precision: 1) %>h</td>
               <td class="num"><%= number_to_currency(invoice.total_amount) %></td>
               <td class="col-actions">
-                <%= link_to "View", invoice_path(invoice), class: "btn btn-ghost", data: { size: "sm" } %>
-                <%= button_to invoice_path(invoice), method: :delete, class: "icon-btn btn-ghost", data: { size: "sm" }, aria: { label: "Delete #{invoice.name}" }, form: { class: "inline-form", data: { turbo_confirm: "Delete this invoice? This can't be undone." } } do %><%= icon "trash" %><% end %>
+                <div class="row-actions">
+                  <%= link_to "View", invoice_path(invoice), class: "btn btn-ghost", data: { size: "sm" } %>
+                  <span class="tooltip-wrap" data-placement="left">
+                    <button type="button" class="icon-btn btn-ghost" data-size="sm" aria-label="Delete <%= invoice.name %>" data-action="dialog#open"><%= icon "trash" %></button>
+                    <span class="tooltip" role="tooltip">Delete invoice</span>
+                  </span>
+                </div>
+                <div class="scrim" hidden data-dialog-target="scrim" data-action="click->dialog#backdrop">
+                  <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dv-t-<%= invoice.id %>" aria-describedby="dv-d-<%= invoice.id %>" data-size="sm">
+                    <div class="panel-header">
+                      <span class="panel-icon" data-tone="danger" aria-hidden="true"><%= icon "trash" %></span>
+                      <div class="panel-heading">
+                        <h2 class="panel-title" id="dv-t-<%= invoice.id %>">Delete this invoice?</h2>
+                        <p class="panel-desc" id="dv-d-<%= invoice.id %>">&ldquo;<%= invoice.name %>&rdquo; will be deleted for good. An XLSX you already exported is not affected.</p>
+                      </div>
+                    </div>
+                    <div class="panel-footer">
+                      <button type="button" class="btn btn-secondary" data-action="dialog#close">Cancel</button>
+                      <%= button_to "Delete invoice", invoice_path(invoice), method: :delete, class: "btn btn-danger-subtle", form: { class: "inline-form" } %>
+                    </div>
+                  </div>
+                </div>
               </td>
             </tr>
           <% end %>
@@ -47,4 +72,9 @@
       </table>
     </div>
   </div>
+<% end %>
+
+<% if @modal_src %>
+  <%# Direct visit to /invoicing: open the setup modal over this page. %>
+  <turbo-frame id="modal" src="<%= @modal_src %>"></turbo-frame>
 <% end %>

@@ -1,0 +1,142 @@
+<%
+  state_tone = { "matched" => "success", "chosen" => "neutral", "none" => "warning" }
+  state_text = { "matched" => "Matched", "chosen" => "Chosen", "none" => "Not compared" }
+  month_label = @month_options.find { |value, _| value == @month }&.last
+  list_summary = pluralize(@list_names.size, "list")
+  from_review = @setup["mode"] == "review"
+  footer = capture do
+    %>
+    <%= link_to "Back", invoicing_path(@setup.merge("step" => 2)), class: "btn btn-ghost" %>
+    <span class="grow"></span>
+    <button type="submit" class="btn btn-primary" data-setup-target="build"><%= from_review ? "Update review" : "Build invoice" %></button>
+    <%
+  end
+  hub_dialog = capture do
+    %>
+    <div class="scrim" hidden data-setup-target="hubDialog" data-action="click->setup#hubBackdrop keydown.esc->setup#closeHub">
+      <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="hub-t" data-size="sm">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2 class="panel-title" id="hub-t">Compare with a Hubstaff project</h2>
+            <p class="panel-desc">Hours logged there are shown next to your ClickUp estimate.</p>
+          </div>
+          <button type="button" class="icon-btn btn-ghost panel-close" data-size="sm" aria-label="Close" data-action="setup#closeHub"><%= icon "x" %></button>
+        </div>
+        <div class="panel-body" style="display:flex;flex-direction:column;gap:var(--space-12)">
+          <div class="input" data-size="sm">
+            <%= icon "search" %>
+            <input type="search" placeholder="Search Hubstaff projects" aria-label="Search Hubstaff projects" data-setup-target="hubFilter" data-action="input->setup#filterHub" autocomplete="off">
+          </div>
+          <div class="fa-list" role="radiogroup" aria-label="Hubstaff projects" data-action="change->setup#syncHubRows">
+            <% @hub_options.each do |option| %>
+              <% value = "#{option[:id]}|#{option[:name]}" %>
+              <label class="chat-row" data-setup-target="hubRow" data-name="<%= option[:name] %>" aria-current="<%= @setup["hubstaff_project_value"] == value %>">
+                <input class="pick-row-input" type="radio" name="hub_pick" value="<%= value %>" data-label="<%= option[:name] %>" <%= "checked" if @setup["hubstaff_project_value"] == value %>>
+                <span class="chat-row-top">
+                  <span class="chat-row-name"><%= option[:name] %></span>
+                  <% if @matched_hub && @matched_hub[:id] == option[:id] %><span class="badge" data-tone="brand">Matched by name</span><% end %>
+                </span>
+              </label>
+            <% end %>
+            <label class="chat-row" data-hub-none aria-current="<%= @setup["hubstaff_project_value"] == "none" %>">
+              <input class="pick-row-input" type="radio" name="hub_pick" value="none" data-label="Not compared" <%= "checked" if @setup["hubstaff_project_value"] == "none" %>>
+              <span class="chat-row-top"><span class="chat-row-name">Do not compare</span></span>
+              <span class="chat-row-text">Hide logged hours on this invoice</span>
+            </label>
+          </div>
+        </div>
+        <div class="panel-footer">
+          <button type="button" class="btn btn-ghost" data-action="setup#closeHub">Cancel</button>
+          <button type="button" class="btn btn-primary" data-action="setup#useHub">Use this project</button>
+        </div>
+      </div>
+    </div>
+    <%
+  end
+%>
+<%= render layout: "invoices/setup/dialog", locals: {
+  step: 3, title: "Check the setup", form_url: invoicing_draft_path, footer: footer, extra: hub_dialog,
+  form_options: { data: { turbo_frame: "_top" } },
+  setup_values: "data-setup-matched-value=\"#{@matched_hub ? "#{@matched_hub[:id]}|#{@matched_hub[:name]}" : ""}\""
+} do %>
+  <%= render "invoices/setup/carry", except: %w[step month rate hubstaff_project_value] %>
+  <%= hidden_field_tag :hubstaff_project_value, @setup["hubstaff_project_value"], id: nil, data: { setup_target: "hubField" } %>
+  <%= hidden_field_tag :rate, number_with_precision(@rate, precision: 2), id: nil, data: { setup_target: "rateField" } %>
+
+  <div class="r2-group">
+    <div class="r2">
+      <span class="r2-label">Project</span>
+      <div class="r2-main">
+        <span class="label-base"><%= @setup["clickup_folder_name"].presence || @mapping&.clickup_folder_name || "No folder" %></span>
+        <span class="caption"><%= @setup["clickup_space_name"] %> space</span>
+      </div>
+      <span class="tooltip-wrap" data-placement="left">
+        <%= link_to invoicing_path(@setup.merge("step" => 1)), class: "icon-btn btn-ghost", data: { size: "sm" }, aria: { label: "Change project" } do %><%= icon "pencil" %><% end %>
+        <span class="tooltip" role="tooltip">Change project</span>
+      </span>
+    </div>
+
+    <div class="r2">
+      <span class="r2-label">Lists</span>
+      <div class="r2-main">
+        <span class="label-base"><%= list_summary %></span>
+        <span class="caption r2-clamp" title="<%= @list_names.join(", ") %>"><%= @list_names.join(", ") %></span>
+      </div>
+      <span class="tooltip-wrap" data-placement="left">
+        <%= link_to invoicing_path(@setup.merge("step" => 2)), class: "icon-btn btn-ghost", data: { size: "sm" }, aria: { label: "Change lists" } do %><%= icon "pencil" %><% end %>
+        <span class="tooltip" role="tooltip">Change lists</span>
+      </span>
+    </div>
+
+    <div class="r2">
+      <span class="r2-label">Hubstaff</span>
+      <div class="r2-main">
+        <span class="body-sm r2-inline">
+          <span data-setup-target="hubName"><%= @hub_state == "none" ? "Not compared" : @hub_name %></span>
+          <span class="badge" data-tone="<%= state_tone[@hub_state] %>" data-setup-target="hubBadge"><%= state_text[@hub_state] %></span>
+        </span>
+        <span class="caption">Hubstaff hours are only used to compare. You bill the ClickUp estimate.</span>
+      </div>
+      <span class="tooltip-wrap" data-placement="left">
+        <button type="button" class="icon-btn btn-ghost" data-size="sm" aria-label="Change the Hubstaff project" data-action="setup#openHub"><%= icon "pencil" %></button>
+        <span class="tooltip" role="tooltip">Change the Hubstaff project</span>
+      </span>
+    </div>
+
+    <div class="r2">
+      <span class="r2-label">Billing cycle</span>
+      <div class="r2-main">
+        <span class="body-sm" data-setup-target="monthLabel"><%= month_label %></span>
+        <span class="caption">Hours are counted for this month, and the invoice is filed under it.</span>
+        <div class="select" style="width:240px;margin-top:var(--space-8)" hidden data-setup-target="monthEditor">
+          <select name="month" aria-label="Billing cycle" data-setup-target="monthSelect" data-action="change->setup#changeMonth">
+            <% @month_options.each do |value, label| %><option value="<%= value %>" <%= "selected" if value == @month %>><%= label %></option><% end %>
+          </select>
+          <%= icon "chevron-down" %>
+        </div>
+      </div>
+      <span class="tooltip-wrap" data-placement="left">
+        <button type="button" class="icon-btn btn-ghost" data-size="sm" aria-label="Change the billing cycle" data-action="setup#toggleMonth"><%= icon "pencil" %></button>
+        <span class="tooltip" role="tooltip">Change the billing cycle</span>
+      </span>
+    </div>
+
+    <div class="r2">
+      <span class="r2-label">Rate</span>
+      <div class="r2-main">
+        <span class="body-sm"><span data-setup-target="rateLabel"><%= number_to_currency(@rate) %></span> per hour</span>
+        <span class="caption"><%= @mapping&.default_hourly_rate ? "Default rate for this project" : "No default rate saved for this project yet" %></span>
+        <div class="input" data-size="sm" style="width:160px;margin-top:var(--space-8)" hidden data-setup-target="rateEditor">
+          <span class="input-affix">$</span>
+          <input type="text" inputmode="decimal" aria-label="Hourly rate for this invoice" aria-describedby="rate-err" value="<%= number_with_precision(@rate, precision: 2) %>" data-setup-target="rateInput" data-action="input->setup#changeRate">
+          <span class="input-affix">/h</span>
+        </div>
+        <span class="field-error" id="rate-err" role="alert" hidden data-setup-target="rateError">Use numbers only, like 40 or 42.50.</span>
+      </div>
+      <span class="tooltip-wrap" data-placement="left">
+        <button type="button" class="icon-btn btn-ghost" data-size="sm" aria-label="Change the rate" data-action="setup#toggleRate"><%= icon "pencil" %></button>
+        <span class="tooltip" role="tooltip">Change the rate</span>
+      </span>
+    </div>
+  </div>
+<% end %>

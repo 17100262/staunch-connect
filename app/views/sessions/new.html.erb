@@ -7,7 +7,7 @@
     <p class="page-desc">Sign in to your workspace</p>
   </div>
 
-  <%= tag.div flash_alerts, class: "flash-stack" if flash.any? %>
+  <%= tag.div flash_alerts, class: "flash-stack" if flash[:alert] %>
 
   <%= form_with url: session_url, class: "form-stack" do |form| %>
     <div class="field">

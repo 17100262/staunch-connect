@@ -7,7 +7,7 @@
   </div>
 </header>
 
-<%= tag.div flash_alerts, class: "flash-stack" if flash.any? %>
+<%= tag.div flash_alerts, class: "flash-stack" if flash[:alert] %>
 
 <% if @conversations.empty? %>
   <div class="empty" data-variant="bordered">

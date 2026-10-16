@@ -1,0 +1,35 @@
+<%
+  footer = capture do
+    %>
+    <%= link_to "Back", invoicing_path(@setup.merge("step" => 1)), class: "btn btn-ghost" %>
+    <span class="grow"></span>
+    <button type="submit" class="btn btn-primary" data-choice-target="submit" disabled>Continue</button>
+    <%
+  end
+%>
+<%= render layout: "invoices/setup/dialog", locals: { step: 2, title: "Which lists?", form_url: invoicing_path, footer: footer, form_options: { data: { controller: "choice" } } } do %>
+  <%= hidden_field_tag :step, 3 %>
+  <%= render "invoices/setup/carry", except: %w[step list_ids] %>
+
+  <% if @lists.empty? %>
+    <div class="empty" data-size="sm">
+      <div class="empty-icon"><%= icon "list-checks" %></div>
+      <h3 class="empty-title">No lists found</h3>
+      <p class="empty-desc">This project has no lists to bill from. Choose another project.</p>
+    </div>
+  <% else %>
+    <div class="r2-inline" style="justify-content: space-between">
+      <span class="field-label">Pick the lists to bill</span>
+      <span class="caption" data-choice-target="count">0 selected</span>
+    </div>
+    <div class="fa-scroll" role="group" aria-label="ClickUp lists">
+      <% @lists.each do |list| %>
+        <label class="check" data-choice-target="row" style="padding: var(--space-8)">
+          <input type="checkbox" name="list_ids[]" value="<%= list["id"] %>" data-action="choice#sync" <%= "checked" if @setup["list_ids"].include?(list["id"]) %>>
+          <span class="check-box"><%= icon "check", class: "i-check" %><%= icon "minus", class: "i-minus" %></span>
+          <span class="check-text"><span><%= list["name"] %></span></span>
+        </label>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

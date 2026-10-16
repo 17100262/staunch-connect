@@ -1,82 +1,181 @@
 <% content_for :title, @invoice.name %>
+<% items = @invoice.invoice_line_items.order(:id).to_a %>
+<% hub_name = @invoice.project_mapping.hubstaff_project_name %>
 
-<nav class="breadcrumb" aria-label="Breadcrumb"><ol>
-  <li><%= link_to "Invoicing", invoices_path %><span class="breadcrumb-sep" aria-hidden="true"><%= icon "chevron-right" %></span></li>
-  <li><span aria-current="page"><%= @invoice.name %></span></li>
-</ol></nav>
-
-<header class="page-header">
-  <div>
-    <h1 class="page-title"><%= @invoice.name %></h1>
-    <p class="page-desc"><%= Date.strptime(@invoice.month, "%Y-%m").strftime("%B %Y") %> · Mapped to Hubstaff project "<%= @invoice.project_mapping.hubstaff_project_name %>"</p>
-  </div>
-  <div class="page-actions">
-    <%= button_to invoice_path(@invoice), method: :delete, class: "btn btn-secondary", form: { data: { turbo_confirm: "Delete this invoice? This can't be undone." } } do %><%= icon "trash" %>Delete invoice<% end %>
-    <%= link_to export_invoice_path(@invoice), class: "btn btn-secondary" do %><%= icon "download" %>Export XLSX<% end %>
-  </div>
-</header>
-
-<%= tag.div flash_alerts, class: "flash-stack" if flash.any? %>
-
-<%= form_with model: @invoice, class: "form-stack" do |form| %>
-  <div class="field narrow">
-    <label class="field-label" for="invoice_name">Invoice name</label>
-    <div class="input"><%= form.text_field :name, id: "invoice_name" %></div>
-  </div>
-
-  <div class="table-card">
-    <div class="table-scroll" tabindex="0" role="region" aria-label="Line items">
-      <table class="table">
-        <caption class="sr-only">Line items</caption>
-        <thead>
-          <tr>
-            <th scope="col">Task</th>
-            <th scope="col">Ticket</th>
-            <th scope="col" class="num">Estimate</th>
-            <th scope="col" class="num">Rate</th>
-            <th scope="col" class="num">Amount</th>
-            <th scope="col">Bill</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% if @invoice.invoice_line_items.empty? %>
-            <tr><td colspan="6" class="cell-secondary">This invoice has no line items.</td></tr>
-          <% else %>
-            <%= form.fields_for :invoice_line_items do |line_form| %>
-              <% item = line_form.object %>
-              <tr class="<%= "row-muted" unless item.billable %>">
-                <td>
-                  <div class="input" data-size="sm"><%= line_form.text_field :title, aria: { label: "Task title" } %></div>
-                  <details>
-                    <summary class="label-sm"><%= item.notes.present? ? pluralize(item.notes.lines.count, "subtask") : "Add notes" %></summary>
-                    <%= line_form.text_area :notes, rows: 3, class: "textarea", placeholder: "Subtasks or other notes for this line item", aria: { label: "Notes" } %>
-                  </details>
-                </td>
-                <td class="cell-secondary code"><%= item.ticket %></td>
-                <td class="cell-secondary num"><%= number_with_precision(item.estimate_hours, precision: 1) %>h</td>
-                <td class="num"><div class="input" data-size="sm"><%= line_form.number_field :hourly_rate, step: 0.01, min: 0, aria: { label: "Hourly rate" } %></div></td>
-                <td class="num"><%= number_to_currency(item.amount) %></td>
-                <td>
-                  <label class="check">
-                    <%= line_form.check_box :billable, aria: { label: "Bill #{item.title}" } %>
-                    <span class="check-box"><%= icon "check", class: "i-check" %><%= icon "minus", class: "i-minus" %></span>
-                  </label>
-                </td>
-              </tr>
-            <% end %>
-            <tr class="table-total">
-              <td colspan="4" class="num">Total</td>
-              <td class="num"><%= number_to_currency(@invoice.total_amount) %></td>
-              <td></td>
-            </tr>
-          <% end %>
-        </tbody>
-      </table>
+<div data-controller="dialogs">
+<%= form_with model: @invoice, data: { controller: "invoice-editor", action: "input->invoice-editor#recalc change->invoice-editor#recalc" } do |form| %>
+  <div class="page-header" data-controller="rename">
+    <div>
+      <div class="title-row">
+        <button type="button" class="title-edit" aria-label="Rename invoice" data-rename-target="display" data-action="rename#start">
+          <h1 class="page-title" style="margin:0" data-rename-target="label"><%= @invoice.name %></h1>
+          <span class="title-edit-icon"><%= icon "pencil" %></span>
+        </button>
+        <div class="title-input" hidden data-rename-target="editor">
+          <div class="input">
+            <%= form.text_field :name, aria: { label: "Invoice name" }, data: { rename_target: "input", invoice_editor_target: "name", action: "blur->rename#finish keydown->rename#key" } %>
+          </div>
+          <span class="caption">Press Enter to keep the name, Esc to cancel.</span>
+        </div>
+        <span class="badge" data-tone="success" data-rename-target="badge" data-invoice-editor-target="badge">Saved</span>
+      </div>
+      <p class="page-desc"><%= Date.strptime(@invoice.month, "%Y-%m").strftime("%B %Y") %> · <%= hub_name.present? ? "Mapped to Hubstaff project “#{hub_name}”" : "Not compared with Hubstaff" %></p>
+    </div>
+    <div class="page-actions">
+      <span class="tooltip-wrap" data-placement="bottom">
+        <button type="button" class="icon-btn btn-ghost" aria-label="Delete invoice" aria-describedby="tp-del" data-action="dialogs#open" data-dialogs-name-param="delete"><%= icon "trash" %></button>
+        <span class="tooltip" role="tooltip" id="tp-del">Delete invoice</span>
+      </span>
+      <span class="tooltip-wrap" data-placement="bottom">
+        <button type="button" class="icon-btn btn-ghost" aria-label="Export XLSX" aria-describedby="tp-exp" data-action="dialogs#open" data-dialogs-name-param="export"><%= icon "download" %></button>
+        <span class="tooltip" role="tooltip" id="tp-exp">Export XLSX</span>
+      </span>
+      <%= form.button "Save changes", type: :submit, class: "btn btn-primary", disabled: true, data: { invoice_editor_target: "save" } %>
     </div>
   </div>
 
-  <div class="toolbar-split">
-    <%= link_to invoices_path, class: "btn btn-ghost" do %><%= icon "chevron-left" %>Back to invoices<% end %>
-    <%= form.button "Save changes", type: :submit, class: "btn btn-primary" %>
+  <div class="page-body-stack">
+    <div class="stats stats-3">
+      <div class="stat-cell"><div class="stat"><span class="stat-label">ClickUp estimate</span><span class="stat-value" data-invoice-editor-target="statEst"><%= number_with_precision(@invoice.invoice_line_items.where(billable: true).sum(:estimate_hours), precision: 1) %> h</span><div class="stat-foot"><span data-invoice-editor-target="billedCount"></span></div></div></div>
+      <div class="stat-cell"><div class="stat"><span class="stat-label">Billing period</span><span class="stat-value"><%= Date.strptime(@invoice.month, "%Y-%m").strftime("%b %Y") %></span><div class="stat-foot"><span><%= @invoice.project_mapping.clickup_folder_name.presence || @invoice.project_mapping.clickup_space_name %></span></div></div></div>
+      <div class="stat-cell"><div class="stat"><span class="stat-label">Invoice total</span><span class="stat-value" data-invoice-editor-target="statTotal"><%= number_to_currency(@invoice.total_amount) %></span><div class="stat-foot"><span>Estimate times rate, billed tasks only</span></div></div></div>
+    </div>
+
+    <p class="caption" style="margin:0">Amount is the estimate times the rate. Change either one and it updates. Untick a task to leave it off the invoice.</p>
+
+    <div class="alert" data-tone="danger" role="alert" hidden data-invoice-editor-target="errorAlert">
+      <%= icon "circle-alert" %>
+      <div class="alert-content"><div>Some hours or rates have letters or symbols in them. Use numbers only, like 8 or 42.50. You can save once they are fixed.</div></div>
+    </div>
+
+    <div class="table-card">
+      <div class="table-scroll" tabindex="0" role="region" aria-label="Invoice lines">
+        <table class="table">
+          <caption class="sr-only">Invoice lines. Estimate and rate can be edited. Amount is calculated.</caption>
+          <thead>
+            <tr>
+              <th scope="col" class="col-check"><span class="sr-only">Bill</span></th>
+              <th scope="col">Task</th>
+              <th scope="col">Ticket</th>
+              <th scope="col" class="num">Estimate</th>
+              <th scope="col" class="num">Rate</th>
+              <th scope="col" class="num">Amount</th>
+            </tr>
+          </thead>
+          <% if items.empty? %>
+            <tbody><tr><td colspan="6" class="cell-secondary">This invoice has no line items.</td></tr></tbody>
+          <% else %>
+            <%= form.fields_for :invoice_line_items, items do |line_form| %>
+              <% item = line_form.object %>
+              <% subtasks = item.notes.to_s.split("\n").map { |line| line.delete_prefix("• ") }.reject(&:blank?) %>
+              <tbody data-controller="toggle">
+                <tr data-invoice-editor-target="row" class="<%= "row-muted" unless item.billable %>">
+                  <td class="col-check">
+                    <label class="check">
+                      <%= line_form.check_box :billable, aria: { label: "Bill #{item.title}" }, data: { invoice_editor_target: "bill" } %>
+                      <span class="check-box"><%= icon "check", class: "i-check" %><%= icon "minus", class: "i-minus" %></span>
+                    </label>
+                  </td>
+                  <td>
+                    <div class="cell-with-action">
+                      <span><%= item.title %></span>
+                      <% if subtasks.any? %>
+                        <button type="button" class="btn btn-ghost" data-size="sm" aria-expanded="false" data-toggle-target="trigger" data-action="toggle#toggle"><%= pluralize(subtasks.size, "subtask") %><%= icon "chevron-down" %></button>
+                      <% end %>
+                    </div>
+                  </td>
+                  <td class="cell-secondary code"><%= item.ticket %></td>
+                  <td class="num">
+                    <div class="input num-input" data-size="sm">
+                      <%= line_form.text_field :estimate_hours, value: number_with_precision(item.estimate_hours, precision: 2, strip_insignificant_zeros: true), inputmode: "decimal", aria: { label: "Estimate in hours for #{item.title}" }, data: { invoice_editor_target: "est" } %>
+                      <span class="input-affix">h</span>
+                    </div>
+                    <span class="field-error num-error" role="alert" hidden>Numbers only</span>
+                  </td>
+                  <td class="num">
+                    <div class="input num-input" data-size="sm">
+                      <span class="input-affix">$</span>
+                      <%= line_form.text_field :hourly_rate, value: number_with_precision(item.hourly_rate, precision: 2), inputmode: "decimal", aria: { label: "Rate per hour for #{item.title}" }, data: { invoice_editor_target: "rate" } %>
+                    </div>
+                    <span class="field-error num-error" role="alert" hidden>Numbers only</span>
+                  </td>
+                  <td class="num" data-invoice-editor-target="amount"><%= number_to_currency(item.amount) %></td>
+                </tr>
+                <% subtasks.each do |title| %>
+                  <tr class="sub-row" hidden data-toggle-target="panel">
+                    <td class="col-check"></td>
+                    <td style="padding-inline-start:var(--space-32)"><span class="body-sm" style="color:var(--fg-secondary)"><%= title %></span></td>
+                    <td></td><td></td><td></td><td></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            <% end %>
+          <% end %>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="total-bar" role="status" aria-live="polite">
+    <span class="body-sm" style="color:var(--fg-secondary)"><span data-invoice-editor-target="billedCount"></span> · <span data-invoice-editor-target="totalHours"></span></span>
+    <div class="total-amount"><span class="body-sm" style="color:var(--fg-secondary)">Total</span><span class="t-heading-md" data-invoice-editor-target="total"><%= number_to_currency(@invoice.total_amount) %></span></div>
   </div>
 <% end %>
+
+
+<div class="scrim" hidden data-dialogs-target="scrim" data-name="export" data-action="click->dialogs#backdrop keydown.esc->dialogs#close">
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="ex-t" data-size="sm">
+    <div class="panel-header">
+      <div class="panel-heading">
+        <h2 class="panel-title" id="ex-t">Export to Excel</h2>
+        <p class="panel-desc">Download this invoice as an XLSX file.</p>
+      </div>
+      <button type="button" class="icon-btn btn-ghost panel-close" data-size="sm" aria-label="Close" data-action="dialogs#close"><%= icon "x" %></button>
+    </div>
+    <%= form_with url: export_invoice_path(@invoice), method: :get, data: { turbo: false, action: "submit->dialogs#closeSoon" }, class: "inline-form" do %>
+      <div class="panel-body" style="display:flex;flex-direction:column;gap:var(--space-16)">
+        <div class="field">
+          <label class="field-label" for="ex-f">File name</label>
+          <div class="input">
+            <%= text_field_tag :file_name, "invoice-#{@invoice.name}-#{@invoice.month}".parameterize, id: "ex-f" %>
+            <span class="input-affix">.xlsx</span>
+          </div>
+        </div>
+        <%= hidden_field_tag :include_subtasks, "0", id: nil %>
+        <label class="check">
+          <%= check_box_tag :include_subtasks, "1", true, id: "ex-sub" %>
+          <span class="check-box"><%= icon "check", class: "i-check" %><%= icon "minus", class: "i-minus" %></span>
+          <span class="check-text"><span>Include subtasks</span></span>
+        </label>
+        <%= hidden_field_tag :include_off, "0", id: nil %>
+        <label class="check">
+          <%= check_box_tag :include_off, "1", true, id: "ex-off" %>
+          <span class="check-box"><%= icon "check", class: "i-check" %><%= icon "minus", class: "i-minus" %></span>
+          <span class="check-text"><span>Include tasks left off this invoice</span></span>
+        </label>
+        <p class="caption" style="margin:0">The file uses the saved invoice. Save your changes first to include them.</p>
+      </div>
+      <div class="panel-footer">
+        <button type="button" class="btn btn-ghost" data-action="dialogs#close">Cancel</button>
+        <button type="submit" class="btn btn-primary"><%= icon "download" %>Export XLSX</button>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<div class="scrim" hidden data-dialogs-target="scrim" data-name="delete" data-action="click->dialogs#backdrop keydown.esc->dialogs#close">
+  <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dl-t" aria-describedby="dl-d" data-size="sm">
+    <div class="panel-header">
+      <span class="panel-icon" data-tone="danger" aria-hidden="true"><%= icon "trash" %></span>
+      <div class="panel-heading">
+        <h2 class="panel-title" id="dl-t">Delete this invoice?</h2>
+        <p class="panel-desc" id="dl-d">&ldquo;<%= @invoice.name %>&rdquo; will be deleted for good. An XLSX you already exported is not affected.</p>
+      </div>
+    </div>
+    <div class="panel-footer">
+      <button type="button" class="btn btn-secondary" data-action="dialogs#close">Cancel</button>
+      <%= button_to "Delete invoice", invoice_path(@invoice), method: :delete, class: "btn btn-danger-subtle", form: { class: "inline-form" } %>
+    </div>
+  </div>
+</div>
+</div>

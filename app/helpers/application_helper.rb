@@ -28,7 +28,7 @@ module ApplicationHelper
 
   # Flash messages as SC alerts.
   def flash_alerts
-    tones = { "notice" => [ "success", "circle-check" ], "alert" => [ "danger", "circle-alert" ] }
+    tones = { "alert" => [ "danger", "circle-alert" ] }
     safe_join(flash.filter_map do |type, message|
       tone, icon_name = tones[type.to_s]
       next unless tone

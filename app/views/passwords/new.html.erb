@@ -7,7 +7,7 @@
     <p class="page-desc">We'll email you reset instructions</p>
   </div>
 
-  <%= tag.div flash_alerts, class: "flash-stack" if flash.any? %>
+  <%= tag.div flash_alerts, class: "flash-stack" if flash[:alert] %>
 
   <%= form_with url: passwords_path, class: "form-stack" do |form| %>
     <div class="field">

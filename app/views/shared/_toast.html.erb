@@ -1,0 +1,8 @@
+<% if flash[:notice].present? %>
+  <div class="toast-region" data-fixed>
+    <div class="toast" role="status" data-tone="success" data-controller="toast">
+      <%= icon "circle-check" %>
+      <div class="toast-content"><div class="toast-title"><%= flash[:notice] %></div></div>
+    </div>
+  </div>
+<% end %>

@@ -1,0 +1,63 @@
+<%
+  footer = capture do
+    %>
+    <span class="grow"></span>
+    <button type="submit" class="btn btn-primary" disabled data-choice-target="submit">Continue</button>
+    <%
+  end
+%>
+<%= render layout: "invoices/setup/dialog", locals: { step: 1, title: "Which project?", form_url: invoicing_path, footer: footer, form_options: { data: { controller: "choice filter" } } } do %>
+  <%= hidden_field_tag :step, 2 %>
+  <%= render "invoices/setup/carry", except: %w[step clickup_folder_id clickup_folder_name list_ids] %>
+  <%= hidden_field_tag :clickup_folder_name, @setup["clickup_folder_name"], id: nil, data: { choice_target: "name" } %>
+
+  <% if @space.nil? %>
+    <div class="empty" data-size="sm">
+      <div class="empty-icon"><%= icon "folder" %></div>
+      <h3 class="empty-title">No ClickUp spaces found</h3>
+      <p class="empty-desc">Check the ClickUp connection in Settings.</p>
+    </div>
+  <% else %>
+    <div class="input" data-size="sm">
+      <%= icon "search" %>
+      <input type="search" placeholder="Search projects" aria-label="Search projects" data-filter-target="input" data-action="input->filter#filter" autocomplete="off">
+    </div>
+
+    <div class="fa-list" role="radiogroup" aria-label="Projects">
+      <% @folders.each do |folder| %>
+        <label class="chat-row" data-filter-target="item" data-choice-target="row" data-name="<%= folder["name"] %>" aria-selected="<%= @setup["clickup_folder_id"] == folder["id"] %>">
+          <input class="pick-row-input" type="radio" name="clickup_folder_id" value="<%= folder["id"] %>" data-label="<%= folder["name"] %>" data-action="choice#sync" <%= "checked" if @setup["clickup_folder_id"] == folder["id"] %>>
+          <span class="chat-row-top"><span class="chat-row-name"><%= folder["name"] %></span></span>
+        </label>
+      <% end %>
+      <% if @folderless_lists.present? %>
+        <label class="chat-row" data-filter-target="item" data-choice-target="row" data-name="No folder" aria-selected="<%= @setup["clickup_folder_id"] == InvoicesController::NO_FOLDER %>">
+          <input class="pick-row-input" type="radio" name="clickup_folder_id" value="<%= InvoicesController::NO_FOLDER %>" data-label="No folder" data-action="choice#sync" <%= "checked" if @setup["clickup_folder_id"] == InvoicesController::NO_FOLDER %>>
+          <span class="chat-row-top"><span class="chat-row-name">No folder</span></span>
+          <span class="chat-row-text">Lists that sit directly in the space</span>
+        </label>
+      <% end %>
+    </div>
+
+    <div class="empty" data-size="sm" data-filter-target="empty" hidden>
+      <h3 class="empty-title">No project matches &ldquo;<span data-query></span>&rdquo;</h3>
+    </div>
+
+    <div class="fa-space">
+      <span class="caption">Showing projects in the <%= @space["name"] %> space</span>
+      <% if @spaces.size > 1 %>
+        <span class="menu-anchor" data-controller="toggle" data-action="keydown.esc->toggle#hide">
+          <button type="button" class="btn btn-ghost" data-size="sm" aria-haspopup="menu" aria-expanded="false" data-toggle-target="trigger" data-action="toggle#toggle">Change</button>
+          <div class="menu" role="menu" aria-label="ClickUp spaces" data-floating data-placement="top" hidden data-toggle-target="panel">
+            <% @spaces.each do |sp| %>
+              <%= link_to invoicing_path(@setup.except("clickup_folder_id", "clickup_folder_name", "list_ids").merge("step" => 1, "clickup_space_id" => sp["id"], "clickup_space_name" => sp["name"])), role: "menuitemradio", class: "menu-item", aria: { checked: (sp["id"] == @space["id"]) } do %>
+                <span><%= sp["name"] %></span>
+                <% if sp["id"] == @space["id"] %><span class="menu-item-check"><%= icon "check" %></span><% end %>
+              <% end %>
+            <% end %>
+          </div>
+        </span>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>

@@ -6,7 +6,7 @@
     <h1 class="page-title">Update your password</h1>
   </div>
 
-  <%= tag.div flash_alerts, class: "flash-stack" if flash.any? %>
+  <%= tag.div flash_alerts, class: "flash-stack" if flash[:alert] %>
 
   <%= form_with url: password_path(params[:token]), method: :put, class: "form-stack" do |form| %>
     <div class="field">

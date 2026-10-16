@@ -13,103 +13,104 @@ class InvoicesController < ApplicationController
     @invoices = Invoice.includes(:project_mapping, :invoice_line_items).order(created_at: :desc)
   end
 
+  # Setup modal (Project -> Lists -> Check the setup). Rendered inside the
+  # `modal` Turbo Frame; a direct (non-frame) visit shows the list with the
+  # modal opened over it.
   def new
-    @clickup_space_id = params[:clickup_space_id]
-    @clickup_folder_id = params[:clickup_folder_id]
+    unless turbo_frame_request?
+      @modal_src = request.fullpath
+      @invoices = Invoice.includes(:project_mapping, :invoice_line_items).order(created_at: :desc)
+      return render :index
+    end
 
-    if @clickup_space_id.blank?
-      @spaces = clickup_client.spaces(team_id)
-      template = :project_picker
-    elsif @clickup_folder_id.blank?
-      @clickup_space_name = params[:clickup_space_name]
-      @folders = clickup_client.folders(@clickup_space_id)
-      @folderless_lists = clickup_client.lists(@clickup_space_id)
-      template = :folder_picker
-    else
-      @mapping = find_mapping(@clickup_folder_id, @clickup_space_id)
+    load_setup
+    @step = params[:step].to_i.clamp(1, 3)
+    @step = 1 if params[:step].blank?
+    @step = 1 if @step > 1 && @setup["clickup_folder_id"].blank?
+    @step = 2 if @step > 2 && @setup["list_ids"].empty?
 
-      if @mapping.nil?
-        @clickup_space_name = params[:clickup_space_name]
-        @clickup_folder_name = params[:clickup_folder_name]
-        @hubstaff_project_options = hubstaff_project_options
-        template = :project_mapping
-      else
-        @lists = lists_for_folder(@clickup_space_id, @clickup_folder_id)
-        template = :list_picker
-      end
+    case @step
+    when 1 then load_projects
+    when 2 then load_lists
+    else load_check
     end
 
     persist_hubstaff_tokens!
-    render template
+    render "invoices/setup/step#{@step}"
   rescue *RETRYABLE_ERRORS => e
     persist_hubstaff_tokens!
-    redirect_to connections_path, alert: e.message
+    @error = e.message
+    render "invoices/setup/error"
   end
 
+  # Review: reconciliation of the chosen lists. Side-effect free; the setup
+  # travels in the query string and is only persisted by #create.
   def draft
-    @clickup_space_id = params[:clickup_space_id]
-    @clickup_folder_id = params[:clickup_folder_id]
-    @list_ids = Array(params[:list_ids]).reject(&:blank?)
+    load_setup
 
-    if @clickup_space_id.blank? || @clickup_folder_id.blank? || @list_ids.empty?
-      return redirect_to invoicing_path, alert: "Select a project and at least one list first."
+    if @setup["clickup_space_id"].blank? || @setup["clickup_folder_id"].blank? || @setup["list_ids"].empty?
+      return redirect_to invoices_path, alert: "Choose a project and at least one list first."
     end
 
-    @mapping = find_mapping(@clickup_folder_id, @clickup_space_id)
-
-    if @mapping.nil?
-      return redirect_to invoicing_path(clickup_space_id: @clickup_space_id, clickup_folder_id: @clickup_folder_id), alert: "Map this project to a Hubstaff project first."
-    end
-
-    @month = params[:month].presence || Date.current.strftime("%Y-%m")
+    @mapping = find_mapping(@setup["clickup_folder_id"], @setup["clickup_space_id"])
+    @hub_id, @hub_name = hubstaff_selection(@setup["hubstaff_project_value"], @mapping)
+    @rate = rate_from(@setup["rate"], @mapping)
+    @month = valid_month(@setup["month"])
     @month_options = last_12_months
     month_start = Date.strptime(@month, "%Y-%m")
-    month_end = month_start.end_of_month
 
-    top_level_tasks, subtasks_by_parent = partition_tasks(@list_ids.flat_map { |list_id| clickup_client.tasks(list_id) })
+    top_level_tasks, subtasks_by_parent = partition_tasks(@setup["list_ids"].flat_map { |list_id| clickup_client.tasks(list_id) })
     @line_items = top_level_tasks.map { |task| build_line_item(task, subtasks_by_parent[task["id"]] || []) }
     @total_estimate_hours = @line_items.sum { |item| item[:estimate_hours] || 0 }
-    @total_amount = @line_items.sum { |item| (item[:estimate_hours] || 0) * (@mapping.default_hourly_rate || 0) }
+    @total_amount = @total_estimate_hours * @rate
+    @project_name = @setup["clickup_folder_name"].presence || @mapping&.clickup_folder_name.presence || @setup["clickup_space_name"]
 
-    organization_id = hubstaff_client.organizations.first["id"]
-    activities = hubstaff_client.daily_activities(
-      organization_id: organization_id,
-      project_id: @mapping.hubstaff_project_id,
-      date_from: month_start.to_s,
-      date_to: month_end.to_s
-    )
-    @total_logged_hours = activities.sum { |activity| activity["tracked"] } / 3600.0
+    if @hub_id.present?
+      organization_id = hubstaff_client.organizations.first["id"]
+      activities = hubstaff_client.daily_activities(
+        organization_id: organization_id,
+        project_id: @hub_id,
+        date_from: month_start.to_s,
+        date_to: month_start.end_of_month.to_s
+      )
+      @total_logged_hours = activities.sum { |activity| activity["tracked"] } / 3600.0
+    end
 
     persist_hubstaff_tokens!
   rescue *RETRYABLE_ERRORS => e
     persist_hubstaff_tokens!
-    redirect_to connections_path, alert: e.message
+    redirect_to invoices_path, alert: e.message
   end
 
   def create
-    clickup_space_id = params[:clickup_space_id]
-    clickup_folder_id = params[:clickup_folder_id]
-    list_ids = Array(params[:list_ids]).reject(&:blank?)
-    month = params[:month].presence || Date.current.strftime("%Y-%m")
+    load_setup
+    list_ids = @setup["list_ids"]
 
-    if clickup_space_id.blank? || clickup_folder_id.blank? || list_ids.empty?
-      return redirect_to invoicing_path, alert: "Select a project and at least one list first."
+    if @setup["clickup_space_id"].blank? || @setup["clickup_folder_id"].blank? || list_ids.empty?
+      return redirect_to invoices_path, alert: "Choose a project and at least one list first."
     end
 
-    mapping = find_mapping(clickup_folder_id, clickup_space_id)
+    month = valid_month(@setup["month"])
+    mapping = find_mapping(@setup["clickup_folder_id"], @setup["clickup_space_id"]) || new_mapping_from_setup
+    hub_id, hub_name = hubstaff_selection(@setup["hubstaff_project_value"], mapping)
+    rate = rate_from(@setup["rate"], mapping)
 
-    if mapping.nil?
-      return redirect_to invoicing_path(clickup_space_id: clickup_space_id, clickup_folder_id: clickup_folder_id), alert: "Map this project to a Hubstaff project first."
+    mapping.hubstaff_project_id = hub_id
+    mapping.hubstaff_project_name = hub_name
+    mapping.default_hourly_rate ||= rate if rate.positive?
+    mapping.save!
+
+    if (existing = Invoice.find_by(project_mapping: mapping, month: month))
+      return redirect_to invoice_path(existing), notice: "An invoice for #{Date.strptime(month, '%Y-%m').strftime('%B %Y')} already exists, so it was opened instead."
     end
 
-    invoice = Invoice.find_by(project_mapping: mapping, month: month)
-    invoice ||= build_invoice(mapping, month, list_ids)
+    invoice = build_invoice(mapping, month, list_ids, rate)
 
     persist_hubstaff_tokens!
-    redirect_to invoice_path(invoice)
+    redirect_to invoice_path(invoice), notice: "Invoice saved."
   rescue *RETRYABLE_ERRORS => e
     persist_hubstaff_tokens!
-    redirect_to connections_path, alert: e.message
+    redirect_to invoices_path, alert: e.message
   end
 
   def show
@@ -119,7 +120,7 @@ class InvoicesController < ApplicationController
   def update
     @invoice = Invoice.find(params[:id])
     @invoice.update!(invoice_params)
-    redirect_to invoice_path(@invoice), notice: "Invoice updated."
+    redirect_to invoice_path(@invoice), notice: "Changes saved."
   end
 
   def destroy
@@ -129,31 +130,42 @@ class InvoicesController < ApplicationController
 
   def export
     invoice = Invoice.find(params[:id])
+    include_subtasks = params[:include_subtasks] != "0"
+    include_off = params[:include_off] == "1"
+
+    items = invoice.invoice_line_items.order(:id)
+    items = items.where(billable: true) unless include_off
 
     package = Axlsx::Package.new
     wrap_style = package.workbook.styles.add_style(alignment: { wrap_text: true, vertical: :top })
 
     package.workbook.add_worksheet(name: "Invoice") do |sheet|
-      sheet.add_row [ "Task", "Ticket", "Hours", "Rate", "Amount", "Notes" ]
-      invoice.invoice_line_items.where(billable: true).each do |item|
-        sheet.add_row(
-          [ item.title, item.ticket, item.estimate_hours, item.hourly_rate, item.amount, item.notes ],
-          style: [ nil, nil, nil, nil, nil, wrap_style ]
-        )
+      header = [ "Task", "Ticket", "Hours", "Rate", "Amount" ]
+      header << "Billed" if include_off
+      header << "Notes" if include_subtasks
+      sheet.add_row header
+
+      items.each do |item|
+        row = [ item.title, item.ticket, item.estimate_hours, item.hourly_rate, item.amount ]
+        row << (item.billable ? "Yes" : "No") if include_off
+        row << item.notes if include_subtasks
+        sheet.add_row row, style: (include_subtasks ? Array.new(row.size - 1) + [ wrap_style ] : nil)
       end
+
       sheet.add_row []
-      sheet.add_row [ nil, nil, nil, "Total", invoice.total_amount ]
-      sheet.column_widths nil, nil, nil, nil, nil, 50
+      sheet.add_row Array.new(header.index("Rate")) + [ "Total", invoice.total_amount ]
+      sheet.column_widths(*Array.new(header.size - 1) + [ include_subtasks ? 50 : nil ])
     end
 
-    filename = "invoice-#{invoice.name}-#{invoice.month}".parameterize(separator: "-") + ".xlsx"
+    base = params[:file_name].to_s.strip.delete_suffix(".xlsx").presence || "invoice-#{invoice.name}-#{invoice.month}"
+    filename = base.parameterize(separator: "-") + ".xlsx"
     send_data package.to_stream.read, filename: filename, type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   end
 
   private
 
   def invoice_params
-    params.require(:invoice).permit(:name, invoice_line_items_attributes: %i[id title hourly_rate billable notes])
+    params.require(:invoice).permit(:name, invoice_line_items_attributes: %i[id title estimate_hours hourly_rate billable notes])
   end
 
   # A folder maps to one project uniquely; the "No Folder" bucket (folderless
@@ -175,7 +187,7 @@ class InvoicesController < ApplicationController
     end
   end
 
-  def build_invoice(mapping, month, list_ids)
+  def build_invoice(mapping, month, list_ids, rate = nil)
     top_level_tasks, subtasks_by_parent = partition_tasks(list_ids.flat_map { |list_id| clickup_client.tasks(list_id) })
     name = mapping.clickup_folder_name.presence || mapping.clickup_space_name.presence || mapping.clickup_space_id
 
@@ -186,7 +198,7 @@ class InvoicesController < ApplicationController
           title: titled_with_ticket_number(task),
           ticket: task["custom_id"].presence || task["id"],
           estimate_hours: task["time_estimate"] ? task["time_estimate"] / 3_600_000.0 : 0,
-          hourly_rate: mapping.default_hourly_rate,
+          hourly_rate: rate.presence || mapping.default_hourly_rate,
           billable: true,
           notes: format_subtask_notes(subtasks_by_parent[task["id"]] || [])
         )
@@ -222,11 +234,103 @@ class InvoicesController < ApplicationController
     field ? "#{field['value']} - #{task['name']}" : task["name"]
   end
 
+  SETUP_SCALARS = %w[clickup_space_id clickup_space_name clickup_folder_id clickup_folder_name month rate hubstaff_project_value mode].freeze
+
+  def load_setup
+    @setup = params.permit(*SETUP_SCALARS, list_ids: []).to_h
+    @setup["list_ids"] = Array(@setup["list_ids"]).reject(&:blank?)
+  end
+
+  def load_projects
+    @spaces = clickup_client.spaces(team_id)
+    @space = @spaces.find { |s| s["id"] == @setup["clickup_space_id"] } || @spaces.first
+    return unless @space
+
+    @setup["clickup_space_id"] = @space["id"]
+    @setup["clickup_space_name"] = @space["name"]
+    @folders = clickup_client.folders(@space["id"])
+    @folderless_lists = clickup_client.lists(@space["id"])
+  end
+
+  def load_lists
+    @lists = lists_for_folder(@setup["clickup_space_id"], @setup["clickup_folder_id"])
+  end
+
+  def load_check
+    @mapping = find_mapping(@setup["clickup_folder_id"], @setup["clickup_space_id"])
+    @hub_options = hubstaff_project_options
+    project_name = @setup["clickup_folder_name"].presence || @mapping&.clickup_folder_name
+    @matched_hub = @hub_options.find { |o| normalize_name(o[:name].split(" / ").last) == normalize_name(project_name) }
+
+    if @setup["hubstaff_project_value"].blank?
+      @setup["hubstaff_project_value"] =
+        if @mapping&.hubstaff_project_id.present?
+          "#{@mapping.hubstaff_project_id}|#{@mapping.hubstaff_project_name}"
+        elsif @matched_hub
+          "#{@matched_hub[:id]}|#{@matched_hub[:name]}"
+        else
+          "none"
+        end
+    end
+
+    @hub_id, @hub_name = hubstaff_selection(@setup["hubstaff_project_value"], @mapping)
+    @hub_state = if @hub_id.blank? then "none"
+                 elsif @matched_hub && @matched_hub[:id].to_s == @hub_id.to_s then "matched"
+                 else "chosen"
+                 end
+    @rate = rate_from(@setup["rate"], @mapping)
+    @month = valid_month(@setup["month"])
+    @month_options = last_12_months
+    @list_names = lists_for_folder(@setup["clickup_space_id"], @setup["clickup_folder_id"])
+      .select { |l| @setup["list_ids"].include?(l["id"]) }.map { |l| l["name"] }
+  end
+
+  # "id|name" from the setup form, "none" for "Do not compare", otherwise the
+  # project saved on the mapping.
+  def hubstaff_selection(value, mapping)
+    return [ nil, nil ] if value == "none"
+    return value.split("|", 2) if value.present?
+
+    [ mapping&.hubstaff_project_id.presence, mapping&.hubstaff_project_name ]
+  end
+
+  def rate_from(value, mapping)
+    parsed = BigDecimal(value.to_s.strip) if value.to_s.strip.match?(/\A\d+(\.\d+)?\z/)
+    return parsed if parsed&.positive?
+
+    mapping&.default_hourly_rate || BigDecimal("0")
+  end
+
+  def valid_month(value)
+    value.to_s.match?(/\A\d{4}-\d{2}\z/) ? value : Date.current.strftime("%Y-%m")
+  end
+
+  def normalize_name(name)
+    name.to_s.downcase.gsub(/[^a-z0-9]/, "")
+  end
+
+  def new_mapping_from_setup
+    folder_id = @setup["clickup_folder_id"]
+    ProjectMapping.new(
+      clickup_space_id: @setup["clickup_space_id"],
+      clickup_space_name: @setup["clickup_space_name"],
+      clickup_folder_id: (folder_id == NO_FOLDER ? nil : folder_id),
+      clickup_folder_name: @setup["clickup_folder_name"]
+    )
+  end
+
   def require_connections
     @clickup_connection = Connection.find_by(source: "clickup")
     @hubstaff_connection = Connection.find_by(source: "hubstaff")
 
-    render :not_connected unless @clickup_connection&.connected? && @hubstaff_connection&.connected?
+    return if @clickup_connection&.connected? && @hubstaff_connection&.connected?
+
+    if turbo_frame_request?
+      @error = "Invoicing needs both ClickUp and Hubstaff connected. Check the connections in Settings."
+      render "invoices/setup/error"
+    else
+      render :not_connected
+    end
   end
 
   def clickup_client

@@ -1,0 +1,35 @@
+<%# Shared shell for the three setup steps. Locals: step, title, form_url, footer (captured HTML). Yields the body. %>
+<% names = [ "Project", "Lists", "Check" ] %>
+<turbo-frame id="modal">
+  <div class="scrim" data-controller="modal setup" data-action="click->modal#backdrop" <%= local_assigns[:setup_values].to_s.html_safe %>>
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="ni-t" data-size="md">
+      <div class="panel-header">
+        <div class="panel-heading">
+          <h2 class="panel-title" id="ni-t"><%= title %></h2>
+          <div class="steps" role="list" aria-label="Setup progress">
+            <% names.each_with_index do |name, i| %>
+              <% n = i + 1 %>
+              <% state = n < step ? "done" : (n == step ? "current" : "upcoming") %>
+              <% reachable = n < step %>
+              <% if reachable %>
+                <%= link_to invoicing_path(@setup.merge("step" => n)), class: "seg", role: "listitem", data: { state: state }, aria: { label: "Step #{n}: #{name}" } do %>
+                  <span class="seg-bar"></span><span class="seg-label"><%= name %></span>
+                <% end %>
+              <% else %>
+                <%= tag.span class: "seg", role: "listitem", data: { state: state }, aria: { current: (n == step ? "step" : nil), disabled: (n > step ? "true" : nil) } do %>
+                  <span class="seg-bar"></span><span class="seg-label"><%= name %></span>
+                <% end %>
+              <% end %>
+            <% end %>
+          </div>
+        </div>
+        <button type="button" class="icon-btn btn-ghost panel-close" data-size="sm" aria-label="Close" data-action="modal#close"><%= icon "x" %></button>
+      </div>
+      <%= form_with url: form_url, method: :get, class: "inline-form", **(local_assigns[:form_options] || {}) do %>
+        <div class="panel-body modal-body"><%= yield %></div>
+        <div class="panel-footer"><%= footer %></div>
+      <% end %>
+    </div>
+    <%= local_assigns[:extra] %>
+  </div>
+</turbo-frame>
