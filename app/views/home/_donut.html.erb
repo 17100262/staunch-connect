@@ -1,0 +1,25 @@
+<%# Locals: donut ([{name, count, color}]), total. A ring split by share; an empty ring when there is nothing to show. %>
+<%
+  r = 75.0
+  circ = 2 * Math::PI * r
+  gap = donut.size > 1 ? 3.0 : 0.0
+  used = 0.0
+  summary = donut.map { |d| "#{d[:name]} #{d[:count]}" }.join(", ")
+%>
+<div class="donut-wrap" style="flex-direction:column;align-items:center;gap:var(--space-20)">
+  <svg viewBox="0 0 176 176" width="200" height="200" role="img" aria-label="Invoices this month by project: <%= summary.presence || "none" %>">
+    <circle cx="88" cy="88" r="<%= r %>" fill="none" stroke="var(--bg-muted)" stroke-width="26"/>
+    <% donut.each do |d| %>
+      <% len = circ * d[:count] / total.to_f %>
+      <circle cx="88" cy="88" r="<%= r %>" fill="none" stroke="<%= d[:color] %>" stroke-width="26" stroke-dasharray="<%= [ len - gap, 0.5 ].max.round(2) %> <%= (circ - [ len - gap, 0.5 ].max).round(2) %>" stroke-dashoffset="<%= (-used).round(2) %>" transform="rotate(-90 88 88)"/>
+      <% used += len %>
+    <% end %>
+    <text x="88" y="94" text-anchor="middle" style="font:var(--text-heading-md);fill:var(--fg-default)"><%= total %></text>
+    <text x="88" y="112" text-anchor="middle" style="font:var(--text-body-sm);fill:var(--fg-secondary)"><%= "invoice".pluralize(total) %></text>
+  </svg>
+  <% if donut.any? %>
+    <div class="leg-col" style="width:100%">
+      <% donut.each do |d| %><span class="leg"><i style="background:<%= d[:color] %>"></i><%= d[:name] %><b><%= d[:count] %></b></span><% end %>
+    </div>
+  <% end %>
+</div>

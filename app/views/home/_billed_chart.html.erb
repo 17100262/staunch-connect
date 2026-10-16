@@ -1,0 +1,29 @@
+<%# Locals: chart ([{label, total}]). Plain SVG bars on a 1/2/5 scale; the latest month is the full-strength bar. %>
+<%
+  max = chart.map { |m| m[:total] }.max.to_f
+  magnitude = 10**Math.log10([ max, 1 ].max).floor
+  top = [ 1, 2, 5, 10 ].map { |f| f * magnitude }.find { |v| v >= max } || max
+  w, h, left, base, ceil_y = 560, 230, 44, 200, 24
+  plot = base - ceil_y
+  slot = (w - left - 8) / chart.size.to_f
+  bar_w = slot * 0.56
+  fmt = ->(n) { n >= 1000 ? "$#{(n / 1000.0).round(n % 1000 == 0 ? 0 : 1)}k" : "$#{n.round}" }
+  summary = chart.map { |m| "#{m[:label]} #{number_to_currency(m[:total], precision: 0)}" }.join(", ")
+%>
+<svg viewBox="0 0 <%= w %> <%= h %>" width="100%" role="img" aria-label="Billed per month: <%= summary %>">
+  <% [ 0, 0.5, 1 ].each do |f| %>
+    <% y = base - plot * f %>
+    <line x1="<%= left %>" x2="<%= w - 8 %>" y1="<%= y %>" y2="<%= y %>" stroke="var(--border-subtle)"/>
+    <text x="<%= left - 6 %>" y="<%= y + 4 %>" text-anchor="end" style="font:var(--text-body-sm);fill:var(--fg-secondary)"><%= fmt.(top * f) %></text>
+  <% end %>
+  <% chart.each_with_index do |m, i| %>
+    <% x = left + slot * i + (slot - bar_w) / 2 %>
+    <% bh = top.zero? ? 0 : plot * m[:total] / top %>
+    <% latest = i == chart.size - 1 %>
+    <rect x="<%= x.round(1) %>" y="<%= (base - bh).round(1) %>" width="<%= bar_w.round(1) %>" height="<%= bh.round(1) %>" rx="4" fill="<%= latest ? "var(--bg-primary)" : "var(--primary-300, var(--bg-primary-subtle))" %>"/>
+    <% if m[:total].positive? %>
+      <text x="<%= (x + bar_w / 2).round(1) %>" y="<%= (base - bh - 6).round(1) %>" text-anchor="middle" style="font:var(--text-body-sm);fill:var(--fg-default)"><%= fmt.(m[:total]) %></text>
+    <% end %>
+    <text x="<%= (x + bar_w / 2).round(1) %>" y="222" text-anchor="middle" style="font:var(--text-body-sm);fill:var(--fg-secondary)"><%= m[:label] %></text>
+  <% end %>
+</svg>

@@ -1,25 +1,186 @@
-<% content_for :title, "Home" %>
+<% content_for :title, "Dashboard" %>
+<%
+  money = ->(n) { number_to_currency(n, precision: (n.to_f % 1).zero? ? 0 : 2) }
+  hours = ->(n) { "#{number_with_precision(n, precision: 1, strip_insignificant_zeros: true)} h" }
+  names = @missing_sources.map { |s| HomeController::SOURCE_LABELS[s] }
+  needs_invoicing_sources = (@missing_sources & %w[hubstaff clickup]).any?
+%>
 
 <header class="page-header">
-  <h1 class="page-title">Home</h1>
+  <div>
+    <h1 class="page-title">Dashboard</h1>
+    <p class="page-desc">What you billed, what needs a look, and what is new</p>
+  </div>
+  <div class="page-actions">
+    <%= link_to invoicing_path, class: "btn btn-secondary", data: { turbo_frame: "modal" } do %><%= icon "plus" %>New invoice<% end %>
+    <%= link_to ai_conversations_path, class: "btn btn-primary" do %><%= icon "message-circle" %>Start a chat<% end %>
+  </div>
 </header>
 
 <%= tag.div flash_alerts, class: "flash-stack" if flash[:alert] %>
 
-<section class="banner" aria-labelledby="home-banner">
-  <div class="banner-body">
-    <h2 class="banner-title" id="home-banner">Connect your first data source</h2>
-    <p class="banner-desc">Link Hubstaff and ClickUp to start building your consolidated task view. Other sources unlock as they come online.</p>
-    <div class="banner-actions">
-      <%= link_to settings_path(section: "connectors"), class: "btn btn-primary", data: { turbo_frame: "modal" } do %><%= icon "plus" %>Connect sources<% end %>
+<div class="dash">
+  <% if @missing_sources.any? %>
+    <section class="banner" aria-labelledby="bn-home">
+      <div class="banner-body">
+        <h2 class="banner-title" id="bn-home">
+          <%= @nothing_connected ? "Your data is feeling left out" : "Connect #{names.to_sentence(last_word_connector: ' and ', two_words_connector: ' and ')} to fill the rest" %>
+        </h2>
+        <p class="banner-desc">
+          <% if @nothing_connected %>
+            Connect Hubstaff and ClickUp and this page fills with hours, estimates and cash.
+          <% elsif needs_invoicing_sources && @missing_sources.include?("fathom") %>
+            Invoicing needs Hubstaff and ClickUp, and new meetings need Fathom.
+          <% elsif needs_invoicing_sources %>
+            Invoicing needs both Hubstaff and ClickUp.
+          <% else %>
+            New meetings show up here once Fathom is connected.
+          <% end %>
+        </p>
+        <div class="banner-actions">
+          <%= link_to settings_path(section: "connectors"), class: "btn btn-primary", data: { turbo_frame: "modal" } do %><%= icon "plus" %><%= @nothing_connected ? "Connect sources" : "Connect #{names.first}" %><% end %>
+        </div>
+      </div>
+      <div class="banner-aside">
+        <span class="avatar-group">
+          <% tones = { "hubstaff" => "info", "clickup" => "brand", "fathom" => "success" } %>
+          <% @missing_sources.each do |source| %><span class="avatar" data-size="lg" data-tone="<%= tones[source] %>"><%= { "hubstaff" => "HS", "clickup" => "CU", "fathom" => "FA" }[source] %></span><% end %>
+        </span>
+        <span class="caption"><%= names.to_sentence(last_word_connector: ", ", two_words_connector: ", ") %></span>
+      </div>
+    </section>
+  <% end %>
+
+  <div class="stats stats-3">
+    <div class="stat-cell"><div class="stat">
+      <span class="stat-label">Billed this month</span>
+      <span class="stat-value <%= "muted" if @invoice_count.zero? %>"><%= money.(@billed_this_month) %></span>
+      <div class="stat-foot">
+        <% if @invoice_count.zero? %><span>No invoices saved in <%= @month_label %></span>
+        <% else %>
+          <span><%= pluralize(@invoice_count, "invoice") %> saved</span>
+          <% if @billed_last_month.positive? %>
+            <% delta = ((@billed_this_month - @billed_last_month) / @billed_last_month * 100).round %>
+            <span class="badge" data-tone="<%= delta >= 0 ? "success" : "warning" %>"><%= icon(delta >= 0 ? "trending-up" : "chevron-down") %><%= delta.abs %>% vs last month</span>
+          <% end %>
+        <% end %>
+      </div>
+    </div></div>
+    <div class="stat-cell"><div class="stat">
+      <span class="stat-label">Hours billed this month</span>
+      <span class="stat-value <%= "muted" if @hours_this_month.zero? %>"><%= hours.(@hours_this_month) %></span>
+      <div class="stat-foot"><span>Last month: <%= hours.(@hours_last_month) %></span></div>
+    </div></div>
+    <div class="stat-cell"><div class="stat">
+      <span class="stat-label">New meetings</span>
+      <span class="stat-value <%= "muted" if @new_meetings_count.zero? %>"><%= @new_meetings_count %></span>
+      <div class="stat-foot"><span>In the last 7 days</span></div>
+    </div></div>
+  </div>
+
+  <div class="dcols eqrow" style="grid-template-columns:minmax(0,3fr) minmax(0,2fr)">
+    <div class="card" data-variant="flat"><div class="card-body dash-card">
+      <div>
+        <h2 class="t-label-lg" style="margin:0">Billed per month</h2>
+        <p class="caption" style="margin:var(--space-4) 0 0">Saved invoices by the month they were made, in dollars</p>
+      </div>
+      <% if @chart.sum { |m| m[:total] }.zero? %>
+        <div class="empty" data-size="sm">
+          <div class="empty-icon"><%= icon "file" %></div>
+          <h3 class="empty-title">No invoices yet</h3>
+          <p class="empty-desc">Once you save an invoice, each month shows here.</p>
+          <%= link_to invoicing_path, class: "btn btn-secondary", data: { size: "sm", turbo_frame: "modal" } do %><%= icon "plus" %>Create invoice<% end %>
+        </div>
+      <% else %>
+        <%= render "home/billed_chart", chart: @chart %>
+      <% end %>
+    </div></div>
+
+    <div class="card" data-variant="flat"><div class="card-body dash-card">
+      <div class="dhead" style="align-items:flex-start">
+        <div>
+          <h2 class="t-label-lg" style="margin:0">Invoices this month</h2>
+          <p class="caption" style="margin:var(--space-4) 0 0">Saved in <%= @month_label %>, by project</p>
+        </div>
+        <%= link_to "View invoices", invoices_path, class: "btn btn-secondary", data: { size: "sm" } %>
+      </div>
+      <%= render "home/donut", donut: @donut, total: @invoice_count %>
+      <p class="take"><%= @invoice_count.zero? ? "Saved invoices show here once you start invoicing." : "#{pluralize(@invoice_count, 'invoice')} saved across #{pluralize(@donut.size, 'project')}." %></p>
+    </div></div>
+  </div>
+
+  <div class="dcols" style="grid-template-columns:minmax(0,3fr) minmax(0,2fr)">
+    <div class="card" data-variant="flat"><div class="card-body dash-card">
+      <div class="dhead">
+        <h2 class="t-label-lg" id="needs-attention" tabindex="-1" style="margin:0">Needs attention</h2>
+        <% if @attention.any? %><span class="badge" data-tone="warning"><%= @attention.size %></span><% end %>
+      </div>
+      <% if @attention.empty? %>
+        <div class="empty" data-size="sm">
+          <div class="empty-icon"><%= icon "check" %></div>
+          <h3 class="empty-title">Nothing needs attention</h3>
+          <p class="empty-desc">Saved invoices with a missing rate or estimate show up here.</p>
+        </div>
+      <% else %>
+        <ul class="file-list">
+          <% @attention.each do |item| %>
+            <li class="file" style="align-items:center">
+              <span class="tile"><%= icon "folder" %></span>
+              <div class="file-main">
+                <span class="file-name"><%= item[:invoice].name %> <span class="badge" data-tone="warning"><%= Date.strptime(item[:invoice].month, "%Y-%m").strftime("%b %Y") %></span></span>
+                <span class="file-meta"><%= item[:detail] %></span>
+              </div>
+              <%= link_to "Open invoice", invoice_path(item[:invoice]), class: "btn btn-secondary", data: { size: "sm" } %>
+            </li>
+          <% end %>
+        </ul>
+      <% end %>
+    </div></div>
+
+    <div class="dash-side">
+      <section class="dsec">
+        <div class="dhead">
+          <h2 class="t-label-lg">Tasks for today</h2>
+          <%= link_to "Open Task 360", task_360_path, class: "btn btn-ghost", data: { size: "sm" } %>
+        </div>
+        <div class="empty" data-size="sm">
+          <div class="empty-icon"><%= icon "list" %></div>
+          <h3 class="empty-title">No tasks yet</h3>
+          <p class="empty-desc">Tasks due today will show here once Task 360 links tasks across your sources.</p>
+        </div>
+      </section>
+
+      <section class="dsec">
+        <div class="dhead">
+          <h2 class="t-label-lg">New meetings <% if @new_meetings_count.positive? %><span class="badge" data-tone="brand"><%= @new_meetings_count %> new</span><% end %></h2>
+          <%= link_to "All meetings", meetings_path, class: "btn btn-ghost", data: { size: "sm" } %>
+        </div>
+        <% if @recent_meetings.empty? %>
+          <div class="empty" data-size="sm">
+            <div class="empty-icon"><%= icon "video" %></div>
+            <h3 class="empty-title">No meetings yet</h3>
+            <p class="empty-desc">Connect Fathom and new meetings show up here.</p>
+            <%= link_to settings_path(section: "connectors"), class: "btn btn-secondary", data: { size: "sm", turbo_frame: "modal" } do %><%= icon "plus" %>Connect Fathom<% end %>
+          </div>
+        <% else %>
+          <ul class="file-list">
+            <% @recent_meetings.each do |meeting| %>
+              <li class="file" style="align-items:center">
+                <span class="tile"><%= icon "video" %></span>
+                <div class="file-main">
+                  <span class="file-name"><%= meeting.title.presence || "Untitled meeting" %></span>
+                  <span class="file-meta">
+                    <%= meeting.recorded_at ? "#{time_ago_in_words(meeting.recorded_at)} ago" : "Date unknown" %>
+                    <% if meeting.processing? %> · Still processing
+                    <% else %><%= " · #{meeting.duration_minutes} min" if meeting.duration_minutes %> · <%= meeting.action_items.any? ? pluralize(meeting.action_items.size, "action item") : "No action items" %><% end %>
+                  </span>
+                </div>
+                <%= link_to "View", meeting_path(meeting), class: "btn btn-ghost", data: { size: "sm" } %>
+              </li>
+            <% end %>
+          </ul>
+        <% end %>
+      </section>
     </div>
   </div>
-  <div class="banner-aside">
-    <span class="avatar-group">
-      <span class="avatar" data-size="lg" data-tone="info">HS</span>
-      <span class="avatar" data-size="lg" data-tone="brand">CU</span>
-      <span class="avatar" data-size="lg" data-tone="success">FA</span>
-    </span>
-    <span class="caption">Hubstaff, ClickUp, Fathom</span>
-  </div>
-</section>
+</div>
